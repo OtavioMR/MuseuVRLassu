@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+
+    "lib": ["ESNext", "DOM"],
+
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+
+    "useDefineForClassFields": true,
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+
+    "types": ["vite/client"]
+  },
+  "include": ["src"]
+}
