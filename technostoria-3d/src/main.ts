@@ -1,5 +1,9 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { VRButton } from 'three/examples/jsm/webxr/VRButton.js';
+
+
+
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x202020);
@@ -19,6 +23,9 @@ document.body.appendChild(renderer.domElement);
 // controles
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
+
+renderer.xr.enabled = true;
+document.body.appendChild(VRButton.createButton(renderer));
 
 // luz
 const light = new THREE.DirectionalLight(0xffffff, 1);
