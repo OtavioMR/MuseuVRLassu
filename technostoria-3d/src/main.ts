@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { VRButton } from 'three/examples/jsm/webxr/VRButton.js';
+import { GLTFLoader } from 'three/examples/jsm/Addons.js';
 
 
 
@@ -38,6 +39,15 @@ const cube = new THREE.Mesh(
   new THREE.MeshStandardMaterial({ color: 0x00ffcc })
 );
 scene.add(cube);
+
+const loader = new GLTFLoader() 
+loader.load(
+  "/src/blender/teste.glb",
+  (gltf) => {
+    const museu = gltf.scene
+    scene.add(museu)
+  }
+)
 
 // loop
 function animate() {
