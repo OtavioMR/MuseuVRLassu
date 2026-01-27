@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { Room } from "./environment/room";
+import { Room } from "./environment/Room";
 import { CameraRig } from "./core/CameraRig";
 
 const scene = new THREE.Scene();
