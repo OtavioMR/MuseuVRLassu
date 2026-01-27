@@ -1,5 +1,3 @@
----
-
 # 🏛️ Virtual Reality Museum – Three.js + WebXR
 
 Este projeto consiste no desenvolvimento de um **museu virtual imersivo em primeira pessoa**, utilizando **Three.js**, **TypeScript** e **WebXR**, com suporte tanto para **VR (Meta Quest)** quanto para **desktop (PC)**.
@@ -244,6 +242,5 @@ Fluxo recomendado:
 Projeto acadêmico / experimental.
 Uso livre para fins educacionais.
 
----
 
 
