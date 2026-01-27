@@ -4,39 +4,49 @@
 
 import * as THREE from 'three';
 import { VRButton } from 'three/examples/jsm/webxr/VRButton.js';
-import { XRControllerModelFactory } from 'three/examples/jsm/webxr/XRControllerModelFactory.js';
 import { PointerLockControls } from 'three/examples/jsm/controls/PointerLockControls.js';
 
 
 // ==============================
-// CONFIGURAÇÕES
+// CONFIGURAÇÕES GERAIS
 // ==============================
 
+// Raio físico do jogador (capsule simplificada)
 const PLAYER_RADIUS = 0.35;
+
+// Raio físico da esfera
 const SPHERE_RADIUS = 0.5;
 
-const roomSize = 10;
-const wallHeight = 4;
+// Dimensões da sala
+const ROOM_SIZE = 10;
+const WALL_HEIGHT = 4;
 
-const pcSpeed = 5;
-const vrSpeed = 0.05;
+// Movimento
+const PC_SPEED = 5;
 
+// Física da esfera
 const THROW_FORCE = 14;
 const GRAVITY = -9.8;
+const SPHERE_DAMPING = 0.98;
 
 
 // ==============================
-// ESTADO DA ESFERA
+// ESTADOS DE JOGO
 // ==============================
 
+// Indica se o jogador está interagindo com algo
+let isInteracting = false;
+
+// Estado da esfera
 let isSphereGrabbed = false;
 const sphereVelocity = new THREE.Vector3();
 
+// Raycaster para interação (mouse / centro da tela)
 const raycaster = new THREE.Raycaster();
 
 
 // ==============================
-// CENA / CÂMERA / RENDERER
+// CENA, CÂMERA E RENDERER
 // ==============================
 
 const scene = new THREE.Scene();
@@ -44,7 +54,12 @@ scene.background = new THREE.Color(0x808080);
 
 const clock = new THREE.Clock();
 
-const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 100);
+const camera = new THREE.PerspectiveCamera(
+  70,
+  window.innerWidth / window.innerHeight,
+  0.1,
+  100
+);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -57,9 +72,11 @@ document.body.appendChild(VRButton.createButton(renderer));
 
 
 // ==============================
-// PLAYER RIG
+// PLAYER RIG (O "CORPO" DO JOGADOR)
 // ==============================
 
+// O jogador NÃO é a câmera
+// O jogador é este Group
 const cameraRig = new THREE.Group();
 cameraRig.position.set(0, 1.7, 2);
 cameraRig.add(camera);
@@ -67,16 +84,26 @@ scene.add(cameraRig);
 
 
 // ==============================
-// CONTROLES PC
+// CONTROLES DE PC (FPS)
 // ==============================
 
+// Apenas controla rotação da câmera
 const pcControls = new PointerLockControls(camera, document.body);
 
+// Clique ativa o mouse
 document.addEventListener('click', () => {
-  if (!renderer.xr.isPresenting) pcControls.lock();
+  if (!renderer.xr.isPresenting && !isInteracting) {
+    pcControls.lock();
+  }
 });
 
-const keyState = { forward: false, backward: false, left: false, right: false };
+// Estado do teclado
+const keyState = {
+  forward: false,
+  backward: false,
+  left: false,
+  right: false
+};
 
 document.addEventListener('keydown', e => {
   if (e.code === 'KeyW') keyState.forward = true;
@@ -94,76 +121,61 @@ document.addEventListener('keyup', e => {
 
 
 // ==============================
-// PEGAR / ARREMESSAR
-// ==============================
-
-document.addEventListener('mousedown', () => {
-  if (renderer.xr.isPresenting) return;
-
-  raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
-  const hits = raycaster.intersectObject(sphere);
-
-  if (hits.length > 0) {
-    isSphereGrabbed = true;
-    sphereVelocity.set(0, 0, 0);
-  }
-});
-
-document.addEventListener('mouseup', () => {
-  if (!isSphereGrabbed) return;
-
-  isSphereGrabbed = false;
-  camera.getWorldDirection(sphereVelocity);
-  sphereVelocity.multiplyScalar(THROW_FORCE);
-});
-
-
-// ==============================
 // ILUMINAÇÃO
 // ==============================
 
 scene.add(new THREE.AmbientLight(0x404040, 1.5));
 
-const dirLight = new THREE.DirectionalLight(0xffffff, 1);
+const dirLight = new THREE.DirectionalLight(0xffffff, 10);
 dirLight.position.set(5, 10, 7.5);
 dirLight.castShadow = true;
 scene.add(dirLight);
 
 
 // ==============================
-// AMBIENTE
+// AMBIENTE (SALA)
 // ==============================
 
+// Piso
 const floor = new THREE.Mesh(
-  new THREE.PlaneGeometry(roomSize, roomSize).rotateX(-Math.PI / 2),
+  new THREE.PlaneGeometry(ROOM_SIZE, ROOM_SIZE).rotateX(-Math.PI / 2),
   new THREE.MeshStandardMaterial({ color: 0x444444, roughness: 0.8 })
 );
 floor.receiveShadow = true;
 scene.add(floor);
 
-const wallMat = new THREE.MeshStandardMaterial({ color: 0xaaaaaa, side: THREE.DoubleSide });
-const wallGeo = new THREE.PlaneGeometry(roomSize, wallHeight);
+// Paredes
+const wallMat = new THREE.MeshStandardMaterial({
+  color: 0xaaaaaa,
+  side: THREE.DoubleSide
+});
+
+const wallGeo = new THREE.PlaneGeometry(ROOM_SIZE, WALL_HEIGHT);
 
 function createWall(x: number, z: number, ry: number) {
   const wall = new THREE.Mesh(wallGeo, wallMat);
-  wall.position.set(x, wallHeight / 2, z);
+  wall.position.set(x, WALL_HEIGHT / 2, z);
   wall.rotation.y = ry;
   scene.add(wall);
 }
 
-createWall(0, -roomSize / 2, 0);
-createWall(0, roomSize / 2, 0);
-createWall(-roomSize / 2, 0, Math.PI / 2);
-createWall(roomSize / 2, 0, -Math.PI / 2);
+createWall(0, -ROOM_SIZE / 2, 0);
+createWall(0, ROOM_SIZE / 2, 0);
+createWall(-ROOM_SIZE / 2, 0, Math.PI / 2);
+createWall(ROOM_SIZE / 2, 0, -Math.PI / 2);
 
 
 // ==============================
-// ESFERA
+// ESFERA INTERATIVA
 // ==============================
 
 const sphere = new THREE.Mesh(
   new THREE.SphereGeometry(SPHERE_RADIUS, 32, 32),
-  new THREE.MeshStandardMaterial({ color: 0xff0000, roughness: 0.1, metalness: 0.5 })
+  new THREE.MeshStandardMaterial({
+    color: 0xff0000,
+    roughness: 0.1,
+    metalness: 0.5
+  })
 );
 
 sphere.position.set(0, SPHERE_RADIUS, 0);
@@ -172,16 +184,59 @@ scene.add(sphere);
 
 
 // ==============================
-// MOVIMENTO JOGADOR
+// INTERAÇÃO: PEGAR / SOLTAR
+// ==============================
+
+document.addEventListener('mousedown', () => {
+  if (renderer.xr.isPresenting) return;
+
+  // Raycast no centro da tela
+  raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+  const hits = raycaster.intersectObject(sphere);
+
+  if (hits.length > 0) {
+    isSphereGrabbed = true;
+    isInteracting = true;
+
+    // Para movimento e rotação
+    pcControls.unlock();
+    sphereVelocity.set(0, 0, 0);
+  }
+});
+
+document.addEventListener('mouseup', () => {
+  if (!isSphereGrabbed) return;
+
+  isSphereGrabbed = false;
+  isInteracting = false;
+
+  // Arremesso baseado na direção da câmera
+  camera.getWorldDirection(sphereVelocity);
+  sphereVelocity.multiplyScalar(THROW_FORCE);
+
+  pcControls.lock();
+});
+
+
+// ==============================
+// MOVIMENTO DO JOGADOR + COLISÃO
 // ==============================
 
 const forward = new THREE.Vector3();
 const strafe = new THREE.Vector3();
 
-function handlePCMovement(dt: number) {
-  if (!pcControls.isLocked) return;
+function collidesWithSphere(nextPos: THREE.Vector3): boolean {
+  const dx = nextPos.x - sphere.position.x;
+  const dz = nextPos.z - sphere.position.z;
 
-  const move = pcSpeed * dt;
+  const dist = Math.sqrt(dx * dx + dz * dz);
+  return dist < PLAYER_RADIUS + SPHERE_RADIUS;
+}
+
+function handlePCMovement(dt: number) {
+  if (!pcControls.isLocked || isInteracting) return;
+
+  const move = PC_SPEED * dt;
 
   camera.getWorldDirection(forward);
   forward.y = 0;
@@ -189,15 +244,22 @@ function handlePCMovement(dt: number) {
 
   strafe.crossVectors(camera.up, forward).normalize();
 
-  if (keyState.forward) cameraRig.position.addScaledVector(forward, move);
-  if (keyState.backward) cameraRig.position.addScaledVector(forward, -move);
-  if (keyState.left) cameraRig.position.addScaledVector(strafe, move);
-  if (keyState.right) cameraRig.position.addScaledVector(strafe, -move);
+  const nextPos = cameraRig.position.clone();
+
+  if (keyState.forward) nextPos.addScaledVector(forward, move);
+  if (keyState.backward) nextPos.addScaledVector(forward, -move);
+  if (keyState.left) nextPos.addScaledVector(strafe, move);
+  if (keyState.right) nextPos.addScaledVector(strafe, -move);
+
+  // Colisão jogador ↔ esfera
+  if (!collidesWithSphere(nextPos)) {
+    cameraRig.position.copy(nextPos);
+  }
 }
 
 
 // ==============================
-// LOOP
+// LOOP PRINCIPAL
 // ==============================
 
 function render() {
@@ -205,47 +267,44 @@ function render() {
 
   handlePCMovement(dt);
 
+  // ==========================
+  // ESFERA: SEGURAR / FÍSICA
+  // ==========================
+
   if (isSphereGrabbed) {
+    // Esfera "presa" à frente da câmera
     const offset = new THREE.Vector3(0, 1, -0.8);
     offset.applyQuaternion(camera.quaternion);
     sphere.position.copy(camera.position).add(offset);
   } else {
+    // Gravidade
     sphereVelocity.y += GRAVITY * dt;
+
+    // Movimento
     sphere.position.addScaledVector(sphereVelocity, dt);
 
-    const damping = Math.exp(-2.5 * dt);
-    sphereVelocity.multiplyScalar(damping);
+    // Atrito
+    sphereVelocity.multiplyScalar(SPHERE_DAMPING);
 
+    // Colisão com chão
     if (sphere.position.y < SPHERE_RADIUS) {
       sphere.position.y = SPHERE_RADIUS;
       sphereVelocity.y = 0;
     }
+
+    // Colisão com paredes
+    const limit = ROOM_SIZE / 2 - SPHERE_RADIUS;
+
+    if (Math.abs(sphere.position.x) > limit) {
+      sphere.position.x = Math.sign(sphere.position.x) * limit;
+      sphereVelocity.x *= -0.6;
+    }
+
+    if (Math.abs(sphere.position.z) > limit) {
+      sphere.position.z = Math.sign(sphere.position.z) * limit;
+      sphereVelocity.z *= -0.6;
+    }
   }
-
-  const wallLimit = roomSize / 2 - SPHERE_RADIUS;
-
-// COLISÃO X
-if (sphere.position.x < -wallLimit) {
-  sphere.position.x = -wallLimit;
-  sphereVelocity.x *= -5; // rebate fraco
-}
-
-if (sphere.position.x > wallLimit) {
-  sphere.position.x = wallLimit;
-  sphereVelocity.x *= -5;
-}
-
-// COLISÃO Z
-if (sphere.position.z < -wallLimit) {
-  sphere.position.z = -wallLimit;
-  sphereVelocity.z *= -5;
-}
-
-if (sphere.position.z > wallLimit) {
-  sphere.position.z = wallLimit;
-  sphereVelocity.z *= -5;
-}
-
 
   renderer.render(scene, camera);
 }
