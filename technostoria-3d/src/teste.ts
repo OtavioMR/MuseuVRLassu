@@ -2,13 +2,19 @@ import * as THREE from 'three';
 import { VRButton } from 'three/examples/jsm/webxr/VRButton.js';
 import { PointerLockControls } from 'three/examples/jsm/controls/PointerLockControls.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { shiftLeft, shiftRight } from 'three/tsl';
 
 // ==============================
 // CONFIG
 // ==============================
 const PLAYER_HEIGHT = 1.7;
-const PLAYER_SPEED = 4;
+var PLAYER_SPEED = 15;
 const GRAVITY = 0;
+
+// ==============================
+// GETTERS E SETTERS
+// ==============================
+
 
 // ==============================
 // CENA
@@ -55,13 +61,29 @@ document.addEventListener('click', () => {
   if (!renderer.xr.isPresenting) controls.lock();
 });
 
-const keys = { w: false, a: false, s: false, d: false };
+const keys = {
+  w: false,
+  a: false,
+  s: false,
+  d: false,
+  shiftLeft: false,
+  shiftRight: false
+};
 
 document.addEventListener('keydown', e => {
   if (e.code === 'KeyW') keys.w = true;
   if (e.code === 'KeyA') keys.a = true;
   if (e.code === 'KeyS') keys.s = true;
   if (e.code === 'KeyD') keys.d = true;
+  if (e.code === 'ShiftLeft') keys.shiftLeft = true;
+  if (e.code === 'ShiftRight') keys.shiftRight = true;
+  // uso correto
+  if (keys.shiftLeft || keys.shiftRight) {
+    console.log('Correndo');
+    PLAYER_SPEED = 30;
+    console.log(PLAYER_SPEED);
+  }
+
 });
 
 document.addEventListener('keyup', e => {
@@ -69,7 +91,13 @@ document.addEventListener('keyup', e => {
   if (e.code === 'KeyA') keys.a = false;
   if (e.code === 'KeyS') keys.s = false;
   if (e.code === 'KeyD') keys.d = false;
+  if (e.code === 'ShiftLeft') keys.shiftLeft = false;
+  if (e.code === 'ShiftRight') keys.shiftRight = false;
+   console.log('Andando');
+    PLAYER_SPEED = 15;
+    console.log(PLAYER_SPEED);
 });
+
 
 // ==============================
 // LUZ
@@ -89,9 +117,10 @@ let museum: THREE.Group | null = null;
 const floorMeshes: THREE.Mesh[] = [];
 
 loader.load(
-  '/models/EstruturaLassuTeste.glb',
+  '/models/EstruturaLassu.glb',
   (gltf) => {
     museum = gltf.scene;
+    museum.scale.setScalar(1);
 
     museum.traverse(obj => {
       if (obj instanceof THREE.Mesh) {
@@ -104,9 +133,11 @@ loader.load(
       }
     });
 
+
     // garante que o museu fique no chão do mundo
     museum.position.set(0, 0, 0);
     scene.add(museum);
+
 
     // spawn do player acima do chão
     player.position.y = PLAYER_HEIGHT + 15;
