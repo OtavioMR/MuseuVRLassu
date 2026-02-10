@@ -26,3 +26,8 @@ Thumbs.db
 
 # ===== Outros =====
 *.log
+
+# ===== Blender / Models =====
+*.blend
+*.fbx
+*.glb
