@@ -7,7 +7,7 @@ import { shiftLeft, shiftRight } from 'three/tsl';
 // ==============================
 // CONFIG
 // ==============================
-const PLAYER_HEIGHT = 1.7;
+const PLAYER_HEIGHT = 4;
 var PLAYER_SPEED = 15;
 const GRAVITY = 0;
 
@@ -93,21 +93,36 @@ document.addEventListener('keyup', e => {
   if (e.code === 'KeyD') keys.d = false;
   if (e.code === 'ShiftLeft') keys.shiftLeft = false;
   if (e.code === 'ShiftRight') keys.shiftRight = false;
-   console.log('Andando');
-    PLAYER_SPEED = 15;
-    console.log(PLAYER_SPEED);
+  console.log('Andando');
+  PLAYER_SPEED = 15;
+  console.log(PLAYER_SPEED);
 });
-
 
 // ==============================
 // LUZ
 // ==============================
 scene.add(new THREE.AmbientLight(0xffffff, 0.6));
-
 const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
 dirLight.position.set(10, 20, 10);
 dirLight.castShadow = true;
 scene.add(dirLight);
+
+const luz2 = new THREE.DirectionalLight(0xffffff, 2);
+luz2.position.set(-10, -20, -10);
+luz2.castShadow = true;
+scene.add(luz2);
+
+// // ==============================
+// // LUZ
+// // ==============================
+// scene.add(new THREE.AmbientLight(0xffffff, 0.9));
+
+// const hemi = new THREE.HemisphereLight(
+//   0xffffff,
+//   0x888888,
+//   0.6
+// );
+// scene.add(hemi);
 
 // ==============================
 // LOAD GLB
@@ -135,7 +150,7 @@ loader.load(
 
 
     // garante que o museu fique no chão do mundo
-    museum.position.set(0, 0, 0);
+    museum.position.set(-170, 0, 0);
     scene.add(museum);
 
 
