@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { sqrt } from 'three/tsl';
 
 
 //INITIAL ANGULAR_VELOCITY
@@ -93,13 +94,21 @@ document.addEventListener('keydown', (event) => {
     switch (event.key) {
         case 'w':
         case 'W':
-        case 'a':
-        case 'A':
+            moveCharacter(1);
+            is_moving = true;
+            break;
         case 's':
         case 'S':
+            moveCharacter(-1);
+            is_moving = true;
+            break;
+        case 'a':
+        case 'A':
+            rotateCharacterOnPlace(-1);
+            break;
         case 'd':
         case 'D':
-            is_moving = true;
+            rotateCharacterOnPlace(1);
             break;
         default:
             is_moving = false;    
@@ -134,7 +143,7 @@ function rotateRLeg() {
     }
 }
 
-function moveCharacter(){
+function animateCharacter(){
     if (L_arm && is_moving){
         rotateLArm();
     } 
@@ -152,8 +161,24 @@ function moveCharacter(){
     }
 }
 
+function moveCharacter(direction: number = 1){
+    if (character){
+        const y = character.rotation.y
+        const x = Math.cos(y);
+        const z = -Math.sin(y);
+        const directionVector = new THREE.Vector3(x,0,z);
+        character.position.addScaledVector(directionVector, 0.02 * direction);
+    }
+}
+
+function rotateCharacterOnPlace(direction: number){
+    if (character){
+        character.rotation.y += direction * 0.05;
+    }
+}
+
 function animate() {
-    moveCharacter();
+    animateCharacter();
     requestAnimationFrame(animate);
     renderer.render(scene, camera);
 }
