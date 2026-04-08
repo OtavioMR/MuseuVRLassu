@@ -86,9 +86,7 @@ document.addEventListener('keydown', e => {
   if (e.code === 'ArrowRight') keys.rightArrow = true;
   // uso correto
   if (keys.shiftLeft || keys.shiftRight) {
-    console.log('Correndo');
     PLAYER_SPEED = 30;
-    console.log(PLAYER_SPEED);
   }
 
 });
@@ -106,9 +104,7 @@ document.addEventListener('keyup', e => {
   if (e.code === 'ArrowDown') keys.downArrow = false;
   if (e.code === 'ArrowLeft') keys.leftArrow = false;
   if (e.code === 'ArrowRight') keys.rightArrow = false;
-  console.log('Andando');
   PLAYER_SPEED = 15;
-  console.log(PLAYER_SPEED);
 });
 
 // ==============================
@@ -271,7 +267,6 @@ const clock = new THREE.Clock();
 
 function animate() {
   const dt = clock.getDelta();
-  console.log(player.position)
 
   if(keys.upArrow){
     steve.move(1);
