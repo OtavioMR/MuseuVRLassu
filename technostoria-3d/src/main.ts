@@ -4,6 +4,7 @@ import { PointerLockControls } from 'three/examples/jsm/controls/PointerLockCont
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { shiftLeft, shiftRight } from 'three/tsl';
 import Character from './ClassCharacter';
+import { io } from 'socket.io-client';
 
 // ==============================
 // CONFIG
@@ -15,15 +16,10 @@ const GRAVITY = 0;
 let is_moving = false;
 
 
-// ==============================
-// CENA
-// ==============================
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x777777);
 
-// ==============================
-// CÂMERA
-// ==============================
+
 const camera = new THREE.PerspectiveCamera(
   70,
   window.innerWidth / window.innerHeight,
@@ -31,9 +27,7 @@ const camera = new THREE.PerspectiveCamera(
   500
 );
 
-// ==============================
-// RENDERER
-// ==============================
+
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(window.devicePixelRatio);
@@ -43,17 +37,12 @@ renderer.shadowMap.enabled = true;
 document.body.appendChild(renderer.domElement);
 document.body.appendChild(VRButton.createButton(renderer));
 
-// ==============================
-// PLAYER
-// ==============================
 const player = new THREE.Group();
 player.position.set(0, PLAYER_HEIGHT, 0);
 player.add(camera);
 scene.add(player);
 
-// ==============================
-// CONTROLES FPS
-// ==============================
+
 const controls = new PointerLockControls(camera, document.body);
 
 document.addEventListener('click', () => {
@@ -84,11 +73,9 @@ document.addEventListener('keydown', e => {
   if (e.code === 'ArrowDown') keys.downArrow = true;
   if (e.code === 'ArrowLeft') keys.leftArrow = true;
   if (e.code === 'ArrowRight') keys.rightArrow = true;
-  // uso correto
   if (keys.shiftLeft || keys.shiftRight) {
     PLAYER_SPEED = 30;
   }
-
 });
 
 
@@ -159,6 +146,45 @@ loader.load(
 
 // Instancia o personagem passando a cena, a posição inicial e a escala
 const steve = new Character(scene, new THREE.Vector3(1, 10, -10), 5);
+
+// ==============================
+// MULTIPLAYER (SOCKET.IO)
+// ==============================
+const socket = io('http://localhost:3000');
+const otherPlayers: { [id: string]: Character } = {};
+
+socket.on('currentPlayers', (players) => {
+  Object.keys(players).forEach((id) => {
+    if (id !== socket.id) {
+      otherPlayers[id] = new Character(scene, new THREE.Vector3(players[id].x, players[id].y, players[id].z), 5);
+    }
+  });
+});
+
+socket.on('newPlayer', (playerInfo) => {
+  otherPlayers[playerInfo.id] = new Character(scene, new THREE.Vector3(playerInfo.player.x, playerInfo.player.y, playerInfo.player.z), 5);
+});
+
+socket.on('playerDisconnected', (id) => {
+  if (otherPlayers[id]) {
+    const characterToRemove = otherPlayers[id].character;
+    if (characterToRemove) {
+      scene.remove(characterToRemove);
+    }
+    delete otherPlayers[id];
+  }
+});
+
+socket.on('playerMoved', (playerInfo) => {
+  const p = otherPlayers[playerInfo.id];
+  if (p) {
+    if (p.character) {
+      p.character.position.set(playerInfo.player.x, playerInfo.player.y, playerInfo.player.z);
+      p.character.rotation.y = playerInfo.player.rotationY;
+    }
+    p.animate(playerInfo.player.isMoving);
+  }
+});
 
 // ==============================
 // COLISÃO COM CHÃO
@@ -265,6 +291,10 @@ chatInput.addEventListener('keydown', (e) => {
 // ==============================
 const clock = new THREE.Clock();
 
+let oldPosition = new THREE.Vector3();
+let oldRotation = 0;
+let oldIsMoving = false;
+
 function animate() {
   const dt = clock.getDelta();
 
@@ -287,6 +317,26 @@ function animate() {
   }
 
   steve.animate(is_moving);
+
+  // Envia a posição do jogador para o servidor se houver mudança
+  if (steve.character) {
+    if (
+      oldPosition.distanceTo(steve.character.position) > 0.01 ||
+      oldRotation !== steve.character.rotation.y ||
+      oldIsMoving !== is_moving
+    ) {
+      socket.emit('playerMovement', {
+        x: steve.character.position.x,
+        y: steve.character.position.y,
+        z: steve.character.position.z,
+        rotationY: steve.character.rotation.y,
+        isMoving: is_moving
+      });
+      oldPosition.copy(steve.character.position);
+      oldRotation = steve.character.rotation.y;
+      oldIsMoving = is_moving;
+    }
+  }
 
   // Movimento
   if (controls.isLocked) {
