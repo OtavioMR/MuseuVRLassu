@@ -9,7 +9,8 @@ import { io } from 'socket.io-client';
 // ==============================
 // CONFIG
 // ==============================
-const PLAYER_HEIGHT = 4;
+const PLAYER_HEIGHT = 2;
+const FLOOR_HEIGHT = 15;
 var PLAYER_SPEED = 15;
 const GRAVITY = 0;
 
@@ -45,8 +46,15 @@ scene.add(player);
 
 const controls = new PointerLockControls(camera, document.body);
 
-document.addEventListener('click', () => {
-  if (!renderer.xr.isPresenting) controls.lock();
+document.addEventListener('click', (e) => {
+  if (
+    !renderer.xr.isPresenting &&
+    document.getElementById('login-container')?.style.display === 'none' &&
+    (e.target as HTMLElement).tagName !== 'INPUT' &&
+    (e.target as HTMLElement).tagName !== 'BUTTON'
+  ) {
+    controls.lock();
+  }
 });
 
 const keys = {
@@ -134,7 +142,7 @@ loader.load(
 
 
     // spawn do player acima do chão
-    player.position.y = PLAYER_HEIGHT + 15;
+    player.position.y = PLAYER_HEIGHT+FLOOR_HEIGHT;
 
     console.log('Museu carregado. Chãos detectados:', floorMeshes.length);
   },
@@ -143,9 +151,6 @@ loader.load(
     console.error('Erro ao carregar GLB:', error);
   }
 );
-
-// Instancia o personagem passando a cena, a posição inicial e a escala
-const steve = new Character(scene, new THREE.Vector3(1, 10, -10), 5);
 
 // ==============================
 // MULTIPLAYER (SOCKET.IO)
@@ -156,13 +161,13 @@ const otherPlayers: { [id: string]: Character } = {};
 socket.on('currentPlayers', (players) => {
   Object.keys(players).forEach((id) => {
     if (id !== socket.id) {
-      otherPlayers[id] = new Character(scene, new THREE.Vector3(players[id].x, players[id].y, players[id].z), 5);
+      otherPlayers[id] = new Character(scene, new THREE.Vector3(players[id].x, players[id].y, players[id].z), 5, players[id].name);
     }
   });
 });
 
 socket.on('newPlayer', (playerInfo) => {
-  otherPlayers[playerInfo.id] = new Character(scene, new THREE.Vector3(playerInfo.player.x, playerInfo.player.y, playerInfo.player.z), 5);
+  otherPlayers[playerInfo.id] = new Character(scene, new THREE.Vector3(playerInfo.player.x, playerInfo.player.y, playerInfo.player.z), 5, playerInfo.player.name);
 });
 
 socket.on('playerDisconnected', (id) => {
@@ -192,6 +197,55 @@ socket.on('playerMoved', (playerInfo) => {
 const raycaster = new THREE.Raycaster();
 const down = new THREE.Vector3(0, -1, 0);
 let velocityY = 0;
+
+// ==============================
+// LOGIN UI
+// ==============================
+const loginContainer = document.createElement('div');
+loginContainer.id = 'login-container';
+loginContainer.style.position = 'absolute';
+loginContainer.style.top = '0';
+loginContainer.style.left = '0';
+loginContainer.style.width = '100vw';
+loginContainer.style.height = '100vh';
+loginContainer.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
+loginContainer.style.display = 'flex';
+loginContainer.style.flexDirection = 'column';
+loginContainer.style.justifyContent = 'center';
+loginContainer.style.alignItems = 'center';
+loginContainer.style.zIndex = '2000';
+
+const title = document.createElement('h1');
+title.innerText = 'Welcome to the Museum';
+title.style.color = 'white';
+title.style.fontFamily = 'sans-serif';
+
+const nameInput = document.createElement('input');
+nameInput.type = 'text';
+nameInput.placeholder = 'Enter your username';
+nameInput.style.padding = '10px';
+nameInput.style.fontSize = '16px';
+nameInput.style.marginBottom = '20px';
+nameInput.style.borderRadius = '4px';
+nameInput.style.border = 'none';
+
+const joinBtn = document.createElement('button');
+joinBtn.innerText = 'Join Game';
+joinBtn.style.padding = '10px 20px';
+joinBtn.style.fontSize = '16px';
+joinBtn.style.cursor = 'pointer';
+
+loginContainer.appendChild(title);
+loginContainer.appendChild(nameInput);
+loginContainer.appendChild(joinBtn);
+document.body.appendChild(loginContainer);
+
+joinBtn.addEventListener('click', () => {
+  const username = nameInput.value.trim() || 'Player';
+  loginContainer.style.display = 'none';
+  socket.emit('join', username);
+  if (!renderer.xr.isPresenting) controls.lock();
+});
 
 // ==============================
 // CHAT UI
@@ -294,48 +348,32 @@ const clock = new THREE.Clock();
 let oldPosition = new THREE.Vector3();
 let oldRotation = 0;
 let oldIsMoving = false;
+const rotationEuler = new THREE.Euler(0, 0, 0, 'YXZ');
 
 function animate() {
   const dt = clock.getDelta();
 
-  if(keys.upArrow){
-    steve.move(1);
-    is_moving = true;
-  }
-  else if(keys.downArrow){
-    steve.move(-1);
-    is_moving = true;
-  }
-  else{
-    is_moving = false;
-  }
-  if(keys.leftArrow){
-    steve.rotateOnPlace(-1);  
-  }
-  else if(keys.rightArrow){
-    steve.rotateOnPlace(1);  
-  }
+  rotationEuler.setFromQuaternion(camera.quaternion);
+  const currentRotationY = rotationEuler.y;
 
-  steve.animate(is_moving);
+  is_moving = controls.isLocked && (keys.w || keys.a || keys.s || keys.d);
 
   // Envia a posição do jogador para o servidor se houver mudança
-  if (steve.character) {
-    if (
-      oldPosition.distanceTo(steve.character.position) > 0.01 ||
-      oldRotation !== steve.character.rotation.y ||
-      oldIsMoving !== is_moving
-    ) {
-      socket.emit('playerMovement', {
-        x: steve.character.position.x,
-        y: steve.character.position.y,
-        z: steve.character.position.z,
-        rotationY: steve.character.rotation.y,
-        isMoving: is_moving
-      });
-      oldPosition.copy(steve.character.position);
-      oldRotation = steve.character.rotation.y;
-      oldIsMoving = is_moving;
-    }
+  if (loginContainer.style.display === 'none' && (
+    oldPosition.distanceTo(player.position) > 0.01 ||
+    oldRotation !== currentRotationY ||
+    oldIsMoving !== is_moving
+  )) {
+    socket.emit('playerMovement', {
+      x: player.position.x,
+      y: player.position.y-7,
+      z: player.position.z,
+      rotationY: currentRotationY + Math.PI/2,
+      isMoving: is_moving
+    });
+    oldPosition.copy(player.position);
+    oldRotation = currentRotationY;
+    oldIsMoving = is_moving;
   }
 
   // Movimento
@@ -378,9 +416,6 @@ function animate() {
 
 renderer.setAnimationLoop(animate);
 
-// ==============================
-// RESIZE
-// ==============================
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();

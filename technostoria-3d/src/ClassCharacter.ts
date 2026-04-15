@@ -1,6 +1,39 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
+function createTextSprite(message: string): THREE.Sprite {
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    if (!context) return new THREE.Sprite();
+
+    context.font = 'Bold 40px Arial';
+    const textWidth = context.measureText(message).width;
+
+    // Add padding to the width/height
+    canvas.width = textWidth + 40;
+    canvas.height = 60;
+
+    // Draw background label
+    context.fillStyle = 'rgba(0, 0, 0, 0.5)';
+    context.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Draw text
+    context.fillStyle = 'white';
+    context.font = 'Bold 40px Arial';
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.fillText(message, canvas.width / 2, canvas.height / 2);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    const spriteMaterial = new THREE.SpriteMaterial({ map: texture });
+    const sprite = new THREE.Sprite(spriteMaterial);
+    
+    // Scale sprite relative to canvas proportions (decreased by 50%)
+    sprite.scale.set(canvas.width / 100, canvas.height / 100, 1);
+    
+    return sprite;
+}
+
 class Character {
     character: THREE.Group | null = null;
     R_arm: THREE.Mesh | null = null;
@@ -16,7 +49,7 @@ class Character {
     was_moving = false;
     base_movement_direction = 1;
 
-    constructor(scene: THREE.Scene, position: THREE.Vector3 = new THREE.Vector3(0, 0, 0), scale: number = 1) {
+    constructor(scene: THREE.Scene, position: THREE.Vector3 = new THREE.Vector3(0, 0, 0), scale: number = 1, name: string = "") {
         const loader = new GLTFLoader();
         loader.load(
             '/models/Steve.glb',
@@ -42,8 +75,15 @@ class Character {
                     }
                 });
 
+                if (name) {
+                    const nametag = createTextSprite(name);
+                    nametag.position.set(0, 2.5, 0); // Position safely above the character's head
+                    this.character.add(nametag);
+                }
+
                 this.character.scale.setScalar(scale);
                 this.character.position.copy(position);
+                this.character.rotation.y = -Math.PI / 2; // Rotate 90 degrees clockwise
                 scene.add(this.character);
             },
             undefined,

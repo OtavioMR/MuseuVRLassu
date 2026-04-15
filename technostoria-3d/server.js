@@ -7,7 +7,7 @@ const httpServer = createServer(app);
 
 const io = new Server(httpServer, {
   cors: {
-    origin: "*", // Allow all origins for development
+    origin: "*",
     methods: ["GET", "POST"]
   }
 });
@@ -24,20 +24,19 @@ io.on('connection', (socket) => {
 
   console.log(`User connected: ${socket.id}`);
 
-  // Initialize the new player with the default spawn coordinates
-  players[socket.id] = {
-    x: 1, y: 10, z: -10,
-    rotationY: 0,
-    isMoving: false
-  };
+  socket.on('join', (name) => {
+    players[socket.id] = {
+      x: 1, y: 8, z: -12,
+      rotationY: 0,
+      isMoving: false,
+      name: name
+    };
 
-  // Send the existing players to the new player
-  socket.emit('currentPlayers', players);
+    socket.emit('currentPlayers', players);
 
-  // Broadcast the new player to all other existing players
-  socket.broadcast.emit('newPlayer', { id: socket.id, player: players[socket.id] });
+    socket.broadcast.emit('newPlayer', { id: socket.id, player: players[socket.id] });
+  });
 
-  // Handle player movement broadcast
   socket.on('playerMovement', (movementData) => {
     if (players[socket.id]) {
       players[socket.id] = { ...players[socket.id], ...movementData };
