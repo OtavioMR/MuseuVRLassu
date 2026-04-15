@@ -44,6 +44,12 @@ io.on('connection', (socket) => {
     }
   });
 
+  socket.on('chatMessage', (msg) => {
+    if (players[socket.id]) {
+      io.emit('chatMessage', `${players[socket.id].name}: ${msg}`);
+    }
+  });
+
   socket.on('disconnect', () => {
     console.log(`User disconnected: ${socket.id}`);
     delete players[socket.id];

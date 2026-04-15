@@ -328,16 +328,20 @@ toggleButton.addEventListener('click', () => {
 
 chatInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && chatInput.value.trim() !== '') {
-    const msg = document.createElement('div');
-    msg.innerText = chatInput.value;
-    msg.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
-    msg.style.padding = '6px';
-    msg.style.borderRadius = '4px';
-    msg.style.wordWrap = 'break-word';
-    messageDisplay.appendChild(msg);
-    messageDisplay.scrollTop = messageDisplay.scrollHeight;
+    socket.emit('chatMessage', chatInput.value.trim());
     chatInput.value = '';
   }
+});
+
+socket.on('chatMessage', (formattedMsg: string) => {
+  const msg = document.createElement('div');
+  msg.innerText = formattedMsg;
+  msg.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
+  msg.style.padding = '6px';
+  msg.style.borderRadius = '4px';
+  msg.style.wordWrap = 'break-word';
+  messageDisplay.appendChild(msg);
+  messageDisplay.scrollTop = messageDisplay.scrollHeight;
 });
 
 // ==============================
