@@ -187,7 +187,7 @@ socket.on('playerMoved', (playerInfo) => {
       p.character.position.set(playerInfo.player.x, playerInfo.player.y, playerInfo.player.z);
       p.character.rotation.y = playerInfo.player.rotationY;
     }
-    p.animate(playerInfo.player.isMoving);
+    p.is_moving = playerInfo.player.isMoving;
   }
 });
 
@@ -414,6 +414,9 @@ function animate() {
       velocityY = 0;
     }
   }
+
+  // Animate other players
+  Object.values(otherPlayers).forEach(p => p.animate(p.is_moving));
 
   renderer.render(scene, camera);
 }

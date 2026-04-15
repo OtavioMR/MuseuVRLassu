@@ -48,6 +48,7 @@ class Character {
 
     was_moving = false;
     base_movement_direction = 1;
+    is_moving = false;
 
     constructor(scene: THREE.Scene, position: THREE.Vector3 = new THREE.Vector3(0, 0, 0), scale: number = 1, name: string = "") {
         const loader = new GLTFLoader();
@@ -123,10 +124,22 @@ class Character {
         } else {
             // Smoothly return arms and legs to neutral (0) position when stopped
             const returnSpeed = 0.1;
-            if (this.L_arm) this.L_arm.rotation.z = THREE.MathUtils.lerp(this.L_arm.rotation.z, 0, returnSpeed);
-            if (this.R_arm) this.R_arm.rotation.z = THREE.MathUtils.lerp(this.R_arm.rotation.z, 0, returnSpeed);
-            if (this.L_leg) this.L_leg.rotation.z = THREE.MathUtils.lerp(this.L_leg.rotation.z, 0, returnSpeed);
-            if (this.R_leg) this.R_leg.rotation.z = THREE.MathUtils.lerp(this.R_leg.rotation.z, 0, returnSpeed);
+            if (this.L_arm) {
+                this.L_arm.rotation.z = THREE.MathUtils.lerp(this.L_arm.rotation.z, 0, returnSpeed);
+                if (Math.abs(this.L_arm.rotation.z) < 0.01) this.L_arm.rotation.z = 0;
+            }
+            if (this.R_arm) {
+                this.R_arm.rotation.z = THREE.MathUtils.lerp(this.R_arm.rotation.z, 0, returnSpeed);
+                if (Math.abs(this.R_arm.rotation.z) < 0.01) this.R_arm.rotation.z = 0;
+            }
+            if (this.L_leg) {
+                this.L_leg.rotation.z = THREE.MathUtils.lerp(this.L_leg.rotation.z, 0, returnSpeed);
+                if (Math.abs(this.L_leg.rotation.z) < 0.01) this.L_leg.rotation.z = 0;
+            }
+            if (this.R_leg) {
+                this.R_leg.rotation.z = THREE.MathUtils.lerp(this.R_leg.rotation.z, 0, returnSpeed);
+                if (Math.abs(this.R_leg.rotation.z) < 0.01) this.R_leg.rotation.z = 0;
+            }
             
             // Alternate the starting limb for the next movement cycle
             if (this.was_moving) {
