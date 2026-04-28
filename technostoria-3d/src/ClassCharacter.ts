@@ -40,6 +40,8 @@ class Character {
     L_arm: THREE.Mesh | null = null;
     L_leg: THREE.Mesh | null = null;
     R_leg: THREE.Mesh | null = null;
+    R_arm_sleeve: THREE.Mesh | null = null;
+    L_arm_sleeve: THREE.Mesh | null = null;
 
     R_arm_rotation_speed = 0.03;
     L_arm_rotation_speed = -0.03;
@@ -50,7 +52,7 @@ class Character {
     base_movement_direction = 1;
     is_moving = false;
 
-    constructor(scene: THREE.Scene, position: THREE.Vector3 = new THREE.Vector3(0, 0, 0), scale: number = 1, name: string = "", color: number = 0xffffff) {
+    constructor(scene: THREE.Scene, position: THREE.Vector3 = new THREE.Vector3(0, 0, 0), scale: number = 1, name: string = "", color: number = 0xffffff, legColor: number = 0xffffff) {
         const loader = new GLTFLoader();
         loader.load(
             '/models/Steve.glb',
@@ -65,13 +67,21 @@ class Character {
                         if (child.material) {
                             if (Array.isArray(child.material)) {
                                 child.material = child.material.map(m => m.clone());
-                                child.material.forEach((m: any) => {
-                                    if (m.color) m.color.setHex(color);
-                                });
+                                if (child.name === 'Torso' || child.name === 'Arm_R_sleeve' || child.name === 'Arm_L_sleeve') {
+                                    child.material.forEach((m: any) => {
+                                        if (m.color) m.color.setHex(color);
+                                    });
+                                } else if (child.name === 'Leg_L' || child.name === 'Leg_R') {
+                                    child.material.forEach((m: any) => {
+                                        if (m.color) m.color.setHex(legColor);
+                                    });
+                                }
                             } else {
                                 child.material = child.material.clone();
-                                if ((child.material as any).color) {
+                                if ((child.name === 'Torso' || child.name === 'Arm_R_sleeve' || child.name === 'Arm_L_sleeve') && (child.material as any).color) {
                                     (child.material as any).color.setHex(color); // Apply unique color tint
+                                } else if ((child.name === 'Leg_L' || child.name === 'Leg_R') && (child.material as any).color) {
+                                    (child.material as any).color.setHex(legColor);
                                 }
                                 
                                 // ---------------------------------------------------------
@@ -95,6 +105,10 @@ class Character {
                             this.L_leg = child;
                         } else if (child.name === 'Leg_R') {
                             this.R_leg = child;
+                        } else if (child.name === 'Arm_L_sleeve') {
+                            this.L_arm_sleeve = child;
+                        } else if (child.name === 'Arm_R_sleeve') {
+                            this.R_arm_sleeve = child;
                         }
                     }
                 });
@@ -124,12 +138,14 @@ class Character {
                     this.L_arm_rotation_speed *= -1;
                 }
                 this.L_arm.rotation.z += this.L_arm_rotation_speed;
+                if (this.L_arm_sleeve) this.L_arm_sleeve.rotation.z = this.L_arm.rotation.z;
             }
             if (this.R_arm) {
                 if (this.R_arm.rotation.z > Math.PI / 4 || this.R_arm.rotation.z < -Math.PI / 4) {
                     this.R_arm_rotation_speed *= -1;
                 }
                 this.R_arm.rotation.z += this.R_arm_rotation_speed;
+                if (this.R_arm_sleeve) this.R_arm_sleeve.rotation.z = this.R_arm.rotation.z;
             }
             if (this.L_leg) {
                 if (this.L_leg.rotation.z > Math.PI / 4 || this.L_leg.rotation.z < -Math.PI / 4) {
@@ -149,10 +165,12 @@ class Character {
             if (this.L_arm) {
                 this.L_arm.rotation.z = THREE.MathUtils.lerp(this.L_arm.rotation.z, 0, returnSpeed);
                 if (Math.abs(this.L_arm.rotation.z) < 0.01) this.L_arm.rotation.z = 0;
+                if (this.L_arm_sleeve) this.L_arm_sleeve.rotation.z = this.L_arm.rotation.z;
             }
             if (this.R_arm) {
                 this.R_arm.rotation.z = THREE.MathUtils.lerp(this.R_arm.rotation.z, 0, returnSpeed);
                 if (Math.abs(this.R_arm.rotation.z) < 0.01) this.R_arm.rotation.z = 0;
+                if (this.R_arm_sleeve) this.R_arm_sleeve.rotation.z = this.R_arm.rotation.z;
             }
             if (this.L_leg) {
                 this.L_leg.rotation.z = THREE.MathUtils.lerp(this.L_leg.rotation.z, 0, returnSpeed);

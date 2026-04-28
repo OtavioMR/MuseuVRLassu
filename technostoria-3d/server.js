@@ -27,13 +27,15 @@ io.on('connection', (socket) => {
   socket.on('join', (name) => {
     // Generate a random color value when a new player joins
     const randomColor = Math.floor(Math.random() * 16777215);
+    const randomLegColor = Math.floor(Math.random() * 16777215);
 
     players[socket.id] = {
       x: 1, y: 8, z: -12,
       rotationY: 0,
       isMoving: false,
       name: name,
-      color: randomColor
+      color: randomColor,
+      legColor: randomLegColor
     };
 
     socket.emit('currentPlayers', players);

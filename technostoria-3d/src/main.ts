@@ -161,13 +161,13 @@ const otherPlayers: { [id: string]: Character } = {};
 socket.on('currentPlayers', (players) => {
   Object.keys(players).forEach((id) => {
     if (id !== socket.id) {
-      otherPlayers[id] = new Character(scene, new THREE.Vector3(players[id].x, players[id].y, players[id].z), 5, players[id].name, players[id].color);
+      otherPlayers[id] = new Character(scene, new THREE.Vector3(players[id].x, players[id].y, players[id].z), 5, players[id].name, players[id].color, players[id].legColor);
     }
   });
 });
 
 socket.on('newPlayer', (playerInfo) => {
-  otherPlayers[playerInfo.id] = new Character(scene, new THREE.Vector3(playerInfo.player.x, playerInfo.player.y, playerInfo.player.z), 5, playerInfo.player.name, playerInfo.player.color);
+  otherPlayers[playerInfo.id] = new Character(scene, new THREE.Vector3(playerInfo.player.x, playerInfo.player.y, playerInfo.player.z), 5, playerInfo.player.name, playerInfo.player.color, playerInfo.player.legColor);
 });
 
 socket.on('playerDisconnected', (id) => {
