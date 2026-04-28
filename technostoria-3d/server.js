@@ -25,11 +25,15 @@ io.on('connection', (socket) => {
   console.log(`User connected: ${socket.id}`);
 
   socket.on('join', (name) => {
+    // Generate a random color value when a new player joins
+    const randomColor = Math.floor(Math.random() * 16777215);
+
     players[socket.id] = {
       x: 1, y: 8, z: -12,
       rotationY: 0,
       isMoving: false,
-      name: name
+      name: name,
+      color: randomColor
     };
 
     socket.emit('currentPlayers', players);

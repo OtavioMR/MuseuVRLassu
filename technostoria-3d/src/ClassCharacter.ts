@@ -50,29 +50,52 @@ class Character {
     base_movement_direction = 1;
     is_moving = false;
 
-    constructor(scene: THREE.Scene, position: THREE.Vector3 = new THREE.Vector3(0, 0, 0), scale: number = 1, name: string = "") {
+    constructor(scene: THREE.Scene, position: THREE.Vector3 = new THREE.Vector3(0, 0, 0), scale: number = 1, name: string = "", color: number = 0xffffff) {
         const loader = new GLTFLoader();
         loader.load(
             '/models/Steve.glb',
             (glb) => {
                 this.character = glb.scene;
                 glb.scene.traverse((child) => {
-                    if (child.name === 'Arm_L') {
-                        this.L_arm = child as THREE.Mesh;
-                        this.L_arm.castShadow = true;
-                        this.L_arm.receiveShadow = true;
-                    } else if (child.name === 'Arm_R') {
-                        this.R_arm = child as THREE.Mesh;
-                        this.R_arm.castShadow = true;
-                        this.R_arm.receiveShadow = true;
-                    } else if (child.name === 'Leg_L') {
-                        this.L_leg = child as THREE.Mesh;
-                        this.L_leg.castShadow = true;
-                        this.L_leg.receiveShadow = true;
-                    } else if (child.name === 'Leg_R') {
-                        this.R_leg = child as THREE.Mesh;
-                        this.R_leg.castShadow = true;
-                        this.R_leg.receiveShadow = true;
+                    if (child instanceof THREE.Mesh) {
+                        child.castShadow = true;
+                        child.receiveShadow = true;
+
+                        // Clone material so changing one player doesn't affect all other players
+                        if (child.material) {
+                            if (Array.isArray(child.material)) {
+                                child.material = child.material.map(m => m.clone());
+                                child.material.forEach((m: any) => {
+                                    if (m.color) m.color.setHex(color);
+                                });
+                            } else {
+                                child.material = child.material.clone();
+                                if ((child.material as any).color) {
+                                    (child.material as any).color.setHex(color); // Apply unique color tint
+                                }
+                                
+                                // ---------------------------------------------------------
+                                // OPTION: If you want to load a completely different image file
+                                // for the skin texture, you can use the code below instead:
+                                // ---------------------------------------------------------
+                                // const textureLoader = new THREE.TextureLoader();
+                                // textureLoader.load(`/textures/skins/skin_${color % 5}.png`, (texture) => {
+                                //     texture.flipY = false; // GLTF models usually require flipped UVs
+                                //     (child.material as any).map = texture;
+                                //     child.material.needsUpdate = true;
+                                // });
+                            }
+                        }
+
+                        if (child.name === 'Arm_L') {
+                            this.L_arm = child;
+                        } else if (child.name === 'Arm_R') {
+                            this.R_arm = child;
+                        } else if (child.name === 'Leg_L') {
+                            this.L_leg = child;
+                        } else if (child.name === 'Leg_R') {
+                            this.R_leg = child;
+                        }
                     }
                 });
 
@@ -122,7 +145,6 @@ class Character {
             }
             this.was_moving = true;
         } else {
-            // Smoothly return arms and legs to neutral (0) position when stopped
             const returnSpeed = 0.1;
             if (this.L_arm) {
                 this.L_arm.rotation.z = THREE.MathUtils.lerp(this.L_arm.rotation.z, 0, returnSpeed);
@@ -141,7 +163,6 @@ class Character {
                 if (Math.abs(this.R_leg.rotation.z) < 0.01) this.R_leg.rotation.z = 0;
             }
             
-            // Alternate the starting limb for the next movement cycle
             if (this.was_moving) {
                 this.base_movement_direction *= -1;
                 this.R_arm_rotation_speed = 0.03 * this.base_movement_direction;
