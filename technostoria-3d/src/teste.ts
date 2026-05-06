@@ -26,9 +26,9 @@
  */
 
 import * as THREE from 'three';
-import { VRButton }                from 'three/examples/jsm/webxr/VRButton.js';
-import { PointerLockControls }     from 'three/examples/jsm/controls/PointerLockControls.js';
-import { GLTFLoader }              from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { VRButton } from 'three/examples/jsm/webxr/VRButton.js';
+import { PointerLockControls } from 'three/examples/jsm/controls/PointerLockControls.js';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 // ────────────────────────────────────────────────────────────
 //  TIPOS AUXILIARES
@@ -39,11 +39,11 @@ import { GLTFLoader }              from 'three/examples/jsm/loaders/GLTFLoader.j
  * está no Modo Exibição.
  */
 interface InformacoesObjeto {
-  nome:      string;
+  nome: string;
   descricao: string;
-  material:  string;
-  peso:      string;
-  extras?:   string[];
+  material: string;
+  peso: string;
+  extras?: string[];
 }
 
 /** Modo de interação atual com o objeto selecionado. */
@@ -56,11 +56,11 @@ type ModoInteracao = 'livre' | 'exibicao';
 class Jogo {
 
   // ── Núcleo Three.js ──────────────────────────────────────
-  private cena:        THREE.Scene;
-  private camera:      THREE.PerspectiveCamera;
+  private cena: THREE.Scene;
+  private camera: THREE.PerspectiveCamera;
   private renderizador: THREE.WebGLRenderer;
-  private controles:   PointerLockControls;
-  private jogador:     THREE.Group;
+  private controles: PointerLockControls;
+  private jogador: THREE.Group;
 
   // ── Raycasting (detecção de clique em objetos 3D) ────────
   /**
@@ -136,13 +136,13 @@ class Jogo {
 
   // ── Física ───────────────────────────────────────────────
   /** Aceleração gravitacional (negativa = puxa para baixo). */
-  private readonly GRAVIDADE       = -18.0;
+  private readonly GRAVIDADE = -18.0;
   /** Multiplicador de velocidade ao arremessar o objeto. */
   private readonly FORCA_LANCAMENTO = 12;
   /** Altura mínima do chão — ajuste conforme o cenário GLB. */
-  private readonly NIVEL_CHAO      = -15.2;
+  private readonly NIVEL_CHAO = -15.2;
   /** Se o objeto cair abaixo disso, é teleportado de volta. */
-  private readonly NIVEL_ABISMO    = -60;
+  private readonly NIVEL_ABISMO = -60;
 
   // ── Utilitários ──────────────────────────────────────────
   private relogio = new THREE.Clock();
@@ -211,27 +211,27 @@ class Jogo {
     painel.id = 'painel-info';
 
     Object.assign(painel.style, {
-      position:        'fixed',
-      top:             '50%',
-      right:           '2rem',
-      transform:       'translateY(-50%)',
-      width:           '260px',
-      background:      'rgba(10, 10, 20, 0.88)',
-      border:          '1px solid rgba(120, 200, 255, 0.35)',
-      borderRadius:    '12px',
-      padding:         '1.2rem 1.4rem',
-      color:           '#e8f4ff',
-      fontFamily:      '"Segoe UI", system-ui, sans-serif',
-      fontSize:        '0.88rem',
-      lineHeight:      '1.6',
-      backdropFilter:  'blur(12px)',
-      boxShadow:       '0 8px 32px rgba(0,0,0,0.5)',
-      display:         'none',          // oculto por padrão
-      flexDirection:   'column',
-      gap:             '0.5rem',
-      transition:      'opacity 0.3s ease',
-      zIndex:          '9999',
-      pointerEvents:   'none',
+      position: 'fixed',
+      top: '50%',
+      right: '2rem',
+      transform: 'translateY(-50%)',
+      width: '260px',
+      background: 'rgba(10, 10, 20, 0.88)',
+      border: '1px solid rgba(120, 200, 255, 0.35)',
+      borderRadius: '12px',
+      padding: '1.2rem 1.4rem',
+      color: '#e8f4ff',
+      fontFamily: '"Segoe UI", system-ui, sans-serif',
+      fontSize: '0.88rem',
+      lineHeight: '1.6',
+      backdropFilter: 'blur(12px)',
+      boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+      display: 'none',          // oculto por padrão
+      flexDirection: 'column',
+      gap: '0.5rem',
+      transition: 'opacity 0.3s ease',
+      zIndex: '9999',
+      pointerEvents: 'none',
     } as CSSStyleDeclaration);
 
     document.body.appendChild(painel);
@@ -326,20 +326,20 @@ class Jogo {
       indicador = document.createElement('div');
       indicador.id = 'indicador-modo';
       Object.assign(indicador.style, {
-        position:   'fixed',
-        bottom:     '1.5rem',
-        left:       '50%',
-        transform:  'translateX(-50%)',
+        position: 'fixed',
+        bottom: '1.5rem',
+        left: '50%',
+        transform: 'translateX(-50%)',
         background: 'rgba(10,10,20,0.75)',
-        border:     '1px solid rgba(120,200,255,0.3)',
+        border: '1px solid rgba(120,200,255,0.3)',
         borderRadius: '8px',
-        padding:    '0.4rem 1rem',
-        color:      '#e8f4ff',
+        padding: '0.4rem 1rem',
+        color: '#e8f4ff',
         fontFamily: '"Segoe UI", system-ui, sans-serif',
-        fontSize:   '0.8rem',
+        fontSize: '0.8rem',
         backdropFilter: 'blur(8px)',
         pointerEvents: 'none',
-        zIndex:     '9999',
+        zIndex: '9999',
         transition: 'all 0.3s ease',
       } as CSSStyleDeclaration);
       document.body.appendChild(indicador);
@@ -371,7 +371,7 @@ class Jogo {
     luzDirecional.castShadow = true;
     luzDirecional.shadow.mapSize.set(2048, 2048);
     luzDirecional.shadow.camera.near = 0.5;
-    luzDirecional.shadow.camera.far  = 300;
+    luzDirecional.shadow.camera.far = 300;
     this.cena.add(luzDirecional);
 
     // Luz de preenchimento: reduz sombras muito escuras
@@ -403,7 +403,7 @@ class Jogo {
       modelo.traverse((obj) => {
         if (!(obj instanceof THREE.Mesh)) return;
 
-        obj.castShadow    = true;
+        obj.castShadow = true;
         obj.receiveShadow = true;
 
         if (!obj.name.toLowerCase().includes('calculadora')) return;
@@ -422,10 +422,10 @@ class Jogo {
 
         // ── Informações exibidas no Modo Exibição ─────────
         obj.userData.informacoes = {
-          nome:      'Calculadora Científica',
+          nome: 'Calculadora Científica',
           descricao: 'Calculadora de alta precisão utilizada em laboratórios de engenharia e física aplicada.',
-          material:  'ABS + Visor LCD',
-          peso:      '≈ 180 g',
+          material: 'ABS + Visor LCD',
+          peso: '≈ 180 g',
           extras: [
             'Funções trigonométricas',
             'Cálculo de matrizes',
@@ -452,16 +452,16 @@ class Jogo {
     // ── Teclado — pressionado ─────────────────────────────
     document.addEventListener('keydown', (e) => {
       switch (e.code) {
-        case 'KeyW':      this.teclas.w     = true;  break;
-        case 'KeyA':      this.teclas.a     = true;  break;
-        case 'KeyS':      this.teclas.s     = true;  break;
-        case 'KeyD':      this.teclas.d     = true;  break;
-        case 'ShiftLeft': this.teclas.shift = true;  break;
+        case 'KeyW': this.teclas.w = true; break;
+        case 'KeyA': this.teclas.a = true; break;
+        case 'KeyS': this.teclas.s = true; break;
+        case 'KeyD': this.teclas.d = true; break;
+        case 'ShiftLeft': this.teclas.shift = true; break;
 
         // [E] — ação principal (pegar ou exibir, conforme o modo)
         case 'KeyE':
-          if (this.modoAtual === 'livre')    this.pegarObjeto();
-          else                               this.ativarModoExibicao();
+          if (this.modoAtual === 'livre') this.pegarObjeto();
+          else this.ativarModoExibicao();
           break;
 
         // [R] — devolver objeto ao lugar de origem
@@ -479,10 +479,10 @@ class Jogo {
     // ── Teclado — solto ───────────────────────────────────
     document.addEventListener('keyup', (e) => {
       switch (e.code) {
-        case 'KeyW':      this.teclas.w     = false; break;
-        case 'KeyA':      this.teclas.a     = false; break;
-        case 'KeyS':      this.teclas.s     = false; break;
-        case 'KeyD':      this.teclas.d     = false; break;
+        case 'KeyW': this.teclas.w = false; break;
+        case 'KeyA': this.teclas.a = false; break;
+        case 'KeyS': this.teclas.s = false; break;
+        case 'KeyD': this.teclas.d = false; break;
         case 'ShiftLeft': this.teclas.shift = false; break;
 
         // Soltar [E] no Modo Livre arremessa o objeto
@@ -498,8 +498,8 @@ class Jogo {
 
       if (e.button === 0) {
         // Botão esquerdo: pegar (Modo Livre) ou exibir (Modo Exibição)
-        if (this.modoAtual === 'livre')    this.pegarObjeto();
-        else                               this.ativarModoExibicao();
+        if (this.modoAtual === 'livre') this.pegarObjeto();
+        else this.ativarModoExibicao();
       }
 
       if (e.button === 2) {
@@ -576,8 +576,8 @@ class Jogo {
     if (colisoes.length === 0) return;
 
     this.objetoSelecionado = colisoes[0].object as THREE.Mesh;
-    this.estaSegurando     = true;
-    this.estaRetornando    = false;
+    this.estaSegurando = true;
+    this.estaRetornando = false;
     this.velocidadeObjeto.set(0, 0, 0);
 
     // Desanexa do pai atual e coloca diretamente na cena raiz
@@ -610,30 +610,20 @@ class Jogo {
    * informações é exibido.
    */
   private ativarModoExibicao(): void {
-    // Se já há um objeto em exibição, devolve antes de pegar outro
-    if (this.objetoSelecionado && !this.estaSegurando) {
-      this.devolverObjeto();
-      return;
-    }
-
     this.raycaster.setFromCamera(this.origemRaio, this.camera);
     const colisoes = this.raycaster.intersectObjects(this.objetosInterativos, true);
 
     if (colisoes.length === 0) return;
 
     this.objetoSelecionado = colisoes[0].object as THREE.Mesh;
-    this.estaSegurando     = false;  // Modo Exibição não usa a flag de segurar
-    this.estaRetornando    = false;
-    this.velocidadeObjeto.set(0, 0, 0);
+    this.estaSegurando = false;
+    this.estaRetornando = false;
 
-    // Reseta a rotação acumulada para começar do zero
+    // Reseta a rotação acumulada para começar do ângulo atual do objeto
     this.rotacaoX = 0;
     this.rotacaoY = 0;
 
-    // Desanexa do cenário para ter controle total da posição
-    this.cena.attach(this.objetoSelecionado);
-
-    // Exibe o painel com as informações do objeto
+    // Exibe o painel com as informações
     const info = this.objetoSelecionado.userData.informacoes as InformacoesObjeto;
     if (info) this.exibirPainel(info);
   }
@@ -644,7 +634,7 @@ class Jogo {
    */
   private devolverObjeto(): void {
     if (!this.objetoSelecionado) return;
-    this.estaSegurando  = false;
+    this.estaSegurando = false;
     this.estaRetornando = true;
     this.velocidadeObjeto.set(0, 0, 0);
     this.ocultarPainel();
@@ -691,29 +681,29 @@ class Jogo {
       this.objetoSelecionado.position.lerp(posicaoAlvo, 0.2);
       this.objetoSelecionado.quaternion.slerp(this.camera.quaternion, 0.1);
 
-    // ── Flutuando (Modo Exibição) ─────────────────────────
+      // ── Flutuando (Modo Exibição) ─────────────────────────
+      // ── Analisando na Mesa (Modo Exibição Estático) ─────────
     } else if (!this.estaSegurando && !this.estaRetornando && this.modoAtual === 'exibicao') {
-      this.tempoFlutuacao += dt;
 
-      // Posição base: 1.8m à frente e levemente abaixo do centro da câmera
-      const posicaoBase = new THREE.Vector3(0, -0.3, -1.8);
-      posicaoBase.applyMatrix4(this.camera.matrixWorld);
+      // 1. Mantém o objeto na posição original da mesa
+      const posOrigem = this.objetoSelecionado.userData.posicaoOrigem as THREE.Vector3;
+      this.objetoSelecionado.position.lerp(posOrigem, 0.1);
 
-      // Efeito de flutuação: deslocamento senoidal no eixo Y
-      const flutuacao = Math.sin(this.tempoFlutuacao * 1.5) * 0.05;
-      posicaoBase.y += flutuacao;
+      // 2. Calcula a nova rotação baseada no mouse + rotação inicial
+      const rotacaoMouse = new THREE.Quaternion();
+      rotacaoMouse.setFromEuler(new THREE.Euler(this.rotacaoX, this.rotacaoY, 0, 'YXZ'));
 
-      this.objetoSelecionado.position.lerp(posicaoBase, 0.08);
+      const rotOrigem = this.objetoSelecionado.userData.rotacaoOrigem as THREE.Quaternion;
 
-      // Aplica a rotação acumulada pelo arrasto do mouse
-      const quaternionAlvo = new THREE.Quaternion();
-      quaternionAlvo.setFromEuler(
-        new THREE.Euler(this.rotacaoX, this.rotacaoY, 0, 'YXZ'),
-      );
-      this.objetoSelecionado.quaternion.slerp(quaternionAlvo, 0.15);
+      // Combina a rotação que o usuário faz com a rotação que o objeto já tinha
+      const rotacaoFinal = new THREE.Quaternion().multiplyQuaternions(rotacaoMouse, rotOrigem);
+
+      // Aplica suavemente
+      this.objetoSelecionado.quaternion.slerp(rotacaoFinal, 0.15);
+    }
 
     // ── Retornando ao lugar de origem ─────────────────────
-    } else if (this.estaRetornando) {
+    else if (this.estaRetornando) {
       const posOrigem = this.objetoSelecionado.userData.posicaoOrigem as THREE.Vector3;
       const rotOrigem = this.objetoSelecionado.userData.rotacaoOrigem as THREE.Quaternion;
 
@@ -724,11 +714,11 @@ class Jogo {
       if (this.objetoSelecionado.position.distanceTo(posOrigem) < 0.01) {
         this.objetoSelecionado.position.copy(posOrigem);
         this.objetoSelecionado.quaternion.copy(rotOrigem);
-        this.estaRetornando    = false;
+        this.estaRetornando = false;
         this.objetoSelecionado = null;
       }
 
-    // ── Física livre (após arremesso) ─────────────────────
+      // ── Física livre (após arremesso) ─────────────────────
     } else if (!this.estaSegurando && !this.estaRetornando) {
       // Aplica gravidade
       this.velocidadeObjeto.y += this.GRAVIDADE * dt;
