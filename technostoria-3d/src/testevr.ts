@@ -1,227 +1,231 @@
 import * as THREE from 'three';
 import { VRButton } from 'three/examples/jsm/webxr/VRButton.js';
-import { XRControllerModelFactory } from 'three/examples/jsm/webxr/XRControllerModelFactory.js';
-// [NEW] Import PointerLockControls for mouse rotation
 import { PointerLockControls } from 'three/examples/jsm/controls/PointerLockControls.js';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { XRControllerModelFactory } from 'three/examples/jsm/webxr/XRControllerModelFactory.js';
 
-// --- Initialization ---
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x808080);
+class Game {
+  private scene: THREE.Scene;
+  private camera: THREE.PerspectiveCamera;
+  private renderer: THREE.WebGLRenderer;
+  private controls: PointerLockControls;
+  private player: THREE.Group;
+  
+  private interactionRaycaster = new THREE.Raycaster();
+  // Corrigindo o erro do TS: Instanciamos o Vector2 uma vez aqui
+  private rayOrigin = new THREE.Vector2(0, 0); 
 
-// Use a Clock to ensure movement speed is consistent regardless of FPS
-const clock = new THREE.Clock();
+  private keys = { w: false, a: false, s: false, d: false, shift: false };
+  private interactiveObjects: THREE.Object3D[] = [];
+  
+  private selectedObject: THREE.Mesh | null = null;
+  private isGrabbed = false;
+  private isReturning = false;
+  private objectVelocity = new THREE.Vector3();
+  
+  // CONFIGURAÇÕES DE FÍSICA (Ajuste GROUND_LEVEL se necessário)
+  private readonly GRAVITY = -18.0; 
+  private readonly THROW_FORCE = 12;
+  private readonly GROUND_LEVEL = -15.2; 
+  private readonly ABYSS_LEVEL = -60;    
 
-const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 100);
+  private clock = new THREE.Clock();
 
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setPixelRatio(window.devicePixelRatio);
-renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.xr.enabled = true;
-renderer.shadowMap.enabled = true;
-document.body.appendChild(renderer.domElement);
+  constructor() {
+    this.scene = new THREE.Scene();
+    this.scene.background = new THREE.Color(0x222222);
 
-document.body.appendChild(VRButton.createButton(renderer));
+    this.camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 1000);
+    this.renderer = new THREE.WebGLRenderer({ antialias: true });
+    this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.renderer.xr.enabled = true;
+    this.renderer.shadowMap.enabled = true;
+    document.body.appendChild(this.renderer.domElement);
+    document.body.appendChild(VRButton.createButton(this.renderer));
 
-// --- The "Character" Rig ---
-const cameraRig = new THREE.Group();
-cameraRig.position.set(0, 0, 2);
-cameraRig.add(camera);
-scene.add(cameraRig);
+    this.player = new THREE.Group();
+    this.player.position.set(0, 4, 10); 
+    this.player.add(this.camera);
+    this.scene.add(this.player);
 
-// --- [NEW] PC Controls Setup ---
-// 1. Setup PointerLock for mouse rotation
-const pcControls = new PointerLockControls(camera, document.body);
+    this.controls = new PointerLockControls(this.camera, document.body);
 
-// 2. Click to enable controls (lock cursor)
-document.addEventListener('click', () => {
-    // Only lock if we are NOT in VR (simple check: is XR session active?)
-    if (!renderer.xr.isPresenting) {
-        pcControls.lock();
-    }
-});
+    this.initLights();
+    this.initEvents();
+    this.loadModel();
 
-// 3. Track Keyboard Inputs
-const keyState = {
-    forward: false,
-    backward: false,
-    left: false,
-    right: false
-};
+    this.renderer.setAnimationLoop(this.animate.bind(this));
+  }
 
-document.addEventListener('keydown', (event) => {
-    switch (event.code) {
-        case 'KeyW': keyState.forward = true; break;
-        case 'KeyS': keyState.backward = true; break;
-        case 'KeyA': keyState.left = true; break;
-        case 'KeyD': keyState.right = true; break;
-    }
-});
+  private initLights() {
+    this.scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+    const dir = new THREE.DirectionalLight(0xffffff, 1.5);
+    dir.position.set(20, 50, 20);
+    dir.castShadow = true;
+    this.scene.add(dir);
+  }
 
-document.addEventListener('keyup', (event) => {
-    switch (event.code) {
-        case 'KeyW': keyState.forward = false; break;
-        case 'KeyS': keyState.backward = false; break;
-        case 'KeyA': keyState.left = false; break;
-        case 'KeyD': keyState.right = false; break;
-    }
-});
+  private loadModel() {
+    const loader = new GLTFLoader();
+    loader.load('/models/EstruturaLassu.glb', (gltf) => {
+      const model = gltf.scene;
+      
+      // Posiciona o cenário
+      model.position.set(-170, -15, 0);
+      this.scene.add(model);
 
+      model.traverse(obj => {
+        if (obj instanceof THREE.Mesh) {
+          obj.castShadow = true;
+          obj.receiveShadow = true;
 
-// --- Lights ---
-const ambientLight = new THREE.AmbientLight(0x404040, 1.5);
-scene.add(ambientLight);
+          // Filtra pela calculadora
+          if (obj.name.toLowerCase().includes("calculadora")) {
+            obj.updateMatrixWorld(true);
+            
+            // Salva posição GLOBAL para o reset funcionar perfeitamente
+            const worldPos = new THREE.Vector3();
+            const worldQuat = new THREE.Quaternion();
+            obj.getWorldPosition(worldPos);
+            obj.getWorldQuaternion(worldQuat);
 
-const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
-directionalLight.position.set(5, 10, 7.5);
-directionalLight.castShadow = true;
-scene.add(directionalLight);
-
-// --- Environment ---
-const roomSize = 10;
-const wallHeight = 4;
-
-// Floor
-const floorGeometry = new THREE.PlaneGeometry(roomSize, roomSize);
-floorGeometry.rotateX(-Math.PI / 2);
-const floorMaterial = new THREE.MeshStandardMaterial({ color: 0x444444, roughness: 0.8 });
-const floor = new THREE.Mesh(floorGeometry, floorMaterial);
-floor.receiveShadow = true;
-scene.add(floor);
-
-// Walls
-const wallMaterial = new THREE.MeshStandardMaterial({ color: 0xaaaaaa, side: THREE.DoubleSide });
-const wallGeoStr = new THREE.PlaneGeometry(roomSize, wallHeight);
-
-const backWall = new THREE.Mesh(wallGeoStr, wallMaterial);
-backWall.position.set(0, wallHeight / 2, -roomSize / 2);
-scene.add(backWall);
-
-const frontWall = new THREE.Mesh(wallGeoStr, wallMaterial);
-frontWall.position.set(0, wallHeight / 2, roomSize / 2);
-scene.add(frontWall);
-
-const leftWall = new THREE.Mesh(wallGeoStr, wallMaterial);
-leftWall.rotateY(Math.PI / 2);
-leftWall.position.set(-roomSize / 2, wallHeight / 2, 0);
-scene.add(leftWall);
-
-const rightWall = new THREE.Mesh(wallGeoStr, wallMaterial);
-rightWall.rotateY(-Math.PI / 2);
-rightWall.position.set(roomSize / 2, wallHeight / 2, 0);
-scene.add(rightWall);
-
-// Sphere
-const sphereGeometry = new THREE.SphereGeometry(0.5, 32, 32);
-const sphereMaterial = new THREE.MeshStandardMaterial({ color: 0xff0000, roughness: 0.1, metalness: 0.5 });
-const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
-sphere.position.set(0, 0.5, 0);
-sphere.castShadow = true;
-scene.add(sphere);
-
-// --- VR Controller Integration ---
-const controllerModelFactory = new XRControllerModelFactory();
-const controllerGrip1 = renderer.xr.getControllerGrip(0);
-controllerGrip1.add(controllerModelFactory.createControllerModel(controllerGrip1));
-cameraRig.add(controllerGrip1);
-
-const controllerGrip2 = renderer.xr.getControllerGrip(1);
-controllerGrip2.add(controllerModelFactory.createControllerModel(controllerGrip2));
-cameraRig.add(controllerGrip2);
-
-// --- Window Resize ---
-window.addEventListener('resize', onWindowResize, false);
-function onWindowResize() {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-}
-
-// --- Animation Loop ---
-
-const vrSpeed = 0.05; // Fixed speed per frame for VR (simple)
-const pcSpeed = 5.0;  // Units per second for PC (uses delta time)
-const workingVector = new THREE.Vector3();
-const dummyCam = new THREE.Camera();
-
-function animate() {
-    renderer.setAnimationLoop(render);
-}
-
-function render() {
-    // Calculate how much time passed since last frame (for smooth PC movement)
-    const dt = clock.getDelta();
-
-    if (renderer.xr.isPresenting) {
-        // --- VR MODE ---
-        handleVRMovement();
-    } else {
-        // --- PC MODE ---
-        handlePCMovement(dt);
-    }
-    
-    // Keep user inside room (Simple Boundary)
-    const limit = roomSize / 2 - 0.5;
-    cameraRig.position.x = THREE.MathUtils.clamp(cameraRig.position.x, -limit, limit);
-    cameraRig.position.z = THREE.MathUtils.clamp(cameraRig.position.z, -limit, limit);
-
-    renderer.render(scene, camera);
-}
-
-// [NEW] PC Movement Logic
-function handlePCMovement(dt: number) {
-    // Only move if mouse is locked (controls active)
-    if (!pcControls.isLocked) return;
-
-    const moveDistance = pcSpeed * dt;
-    
-    // Get the direction the camera is facing
-    camera.getWorldDirection(workingVector);
-    workingVector.y = 0; // Flatten to floor
-    workingVector.normalize();
-
-    // Calculate "Right" vector (perpendicular to forward)
-    const strafeVector = new THREE.Vector3();
-    strafeVector.crossVectors(camera.up, workingVector).normalize();
-
-    // Forward/Back
-    if (keyState.forward) cameraRig.position.addScaledVector(workingVector, moveDistance);
-    if (keyState.backward) cameraRig.position.addScaledVector(workingVector, -moveDistance);
-
-    // Left/Right
-    // Note: strafeVector points Left by default in this cross product order (Up x Forward) ??
-    // Actually typically Up x Forward = Left, but let's test.
-    // Standard Right Hand Rule: Thumb(Y), Index(Z-Forward), Middle(X-Right). 
-    // Three.js: Forward is -Z. Cross(Y, -Z) = -X (Left).
-    if (keyState.left) cameraRig.position.addScaledVector(strafeVector, moveDistance);
-    if (keyState.right) cameraRig.position.addScaledVector(strafeVector, -moveDistance);
-}
-
-// VR Movement Logic
-function handleVRMovement() {
-    const session = renderer.xr.getSession();
-    if (!session) return;
-
-    for (const source of session.inputSources) {
-        if (source.handedness === 'left' && source.gamepad) {
-            const x = source.gamepad.axes[2]; 
-            const z = source.gamepad.axes[3]; 
-
-            if (Math.abs(x) > 0.1 || Math.abs(z) > 0.1) {
-                dummyCam.getWorldDirection(workingVector);
-                workingVector.y = 0;
-                workingVector.normalize();
-
-                const strafeVector = new THREE.Vector3();
-                strafeVector.crossVectors(camera.up, workingVector).normalize();
-
-                workingVector.multiplyScalar(-z * vrSpeed);
-                strafeVector.multiplyScalar(x * vrSpeed);
-
-                cameraRig.position.add(workingVector);
-                cameraRig.position.add(strafeVector);
-            }
+            obj.userData.homePosition = worldPos.clone();
+            obj.userData.homeRotation = worldQuat.clone();
+            
+            this.interactiveObjects.push(obj);
+          }
         }
+      });
+    });
+  }
+
+  private initEvents() {
+    // Interação de Clique
+    document.addEventListener('mousedown', () => {
+        if (this.controls.isLocked) this.grabObject();
+    });
+
+    document.addEventListener('mouseup', () => this.throwObject());
+
+    // Teclado
+    document.addEventListener('keydown', (e) => {
+      if (e.code === 'KeyW') this.keys.w = true;
+      if (e.code === 'KeyA') this.keys.a = true;
+      if (e.code === 'KeyS') this.keys.s = true;
+      if (e.code === 'KeyD') this.keys.d = true;
+      if (e.code === 'KeyE') this.grabObject();
+      if (e.code === 'ShiftLeft') this.keys.shift = true;
+    });
+
+    document.addEventListener('keyup', (e) => {
+      if (e.code === 'KeyW') this.keys.w = false;
+      if (e.code === 'KeyA') this.keys.a = false;
+      if (e.code === 'KeyS') this.keys.s = false;
+      if (e.code === 'KeyD') this.keys.d = false;
+      if (e.code === 'KeyE') this.throwObject();
+      if (e.code === 'ShiftLeft') this.keys.shift = false;
+    });
+
+    document.addEventListener('click', () => {
+        if (!this.isGrabbed) this.controls.lock();
+    });
+
+    window.addEventListener('resize', () => {
+      this.camera.aspect = window.innerWidth / window.innerHeight;
+      this.camera.updateProjectionMatrix();
+      this.renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  }
+
+  private grabObject() {
+    // RESOLUÇÃO DO ERRO: Usando a instância de Vector2 da classe
+    this.interactionRaycaster.setFromCamera(this.rayOrigin, this.camera);
+    const hits = this.interactionRaycaster.intersectObjects(this.interactiveObjects, true);
+
+    if (hits.length > 0) {
+      this.selectedObject = hits[0].object as THREE.Mesh;
+      this.isGrabbed = true;
+      this.isReturning = false;
+      this.objectVelocity.set(0, 0, 0);
+      
+      // Remove do grupo do cenário e coloca na raiz da cena para não "sumir" com o cenário
+      this.scene.attach(this.selectedObject);
     }
+  }
+
+  private throwObject() {
+    if (!this.selectedObject || !this.isGrabbed) return;
+    this.isGrabbed = false;
+    
+    const dir = new THREE.Vector3();
+    this.camera.getWorldDirection(dir);
+    this.objectVelocity.copy(dir).multiplyScalar(this.THROW_FORCE);
+  }
+
+  private updatePhysics(dt: number) {
+    if (!this.selectedObject) return;
+
+    if (this.isGrabbed) {
+      // Posição alvo: 2 metros à frente
+      const targetPos = new THREE.Vector3(0, 0, -2);
+      targetPos.applyMatrix4(this.camera.matrixWorld);
+      
+      // Movimento suave (Lerp)
+      this.selectedObject.position.lerp(targetPos, 0.2);
+      this.selectedObject.quaternion.slerp(this.camera.quaternion, 0.1);
+
+    } else if (this.isReturning) {
+      const home = this.selectedObject.userData.homePosition as THREE.Vector3;
+      const homeRot = this.selectedObject.userData.homeRotation as THREE.Quaternion;
+
+      this.selectedObject.position.lerp(home, 0.1);
+      this.selectedObject.quaternion.slerp(homeRot, 0.1);
+
+      // Trava no lugar final
+      if (this.selectedObject.position.distanceTo(home) < 0.01) {
+        this.selectedObject.position.copy(home);
+        this.selectedObject.quaternion.copy(homeRot);
+        this.isReturning = false;
+        this.selectedObject = null;
+      }
+    } else {
+      // Gravidade
+      this.objectVelocity.y += this.GRAVITY * dt;
+      this.selectedObject.position.addScaledVector(this.objectVelocity, dt);
+
+      // SEGURANÇA 1: Colisão com o chão
+      if (this.selectedObject.position.y < this.GROUND_LEVEL) {
+        this.selectedObject.position.y = this.GROUND_LEVEL;
+        this.objectVelocity.set(0,0,0);
+        
+        // Retorno automático após 1.5 segundos parado
+        setTimeout(() => { 
+          if(!this.isGrabbed && this.selectedObject) this.isReturning = true; 
+        }, 1500);
+      }
+
+      // SEGURANÇA 2: Se cair no vazio (limbo), reseta imediatamente
+      if (this.selectedObject.position.y < this.ABYSS_LEVEL) {
+        this.isReturning = true;
+        this.objectVelocity.set(0,0,0);
+      }
+    }
+  }
+
+  private animate() {
+    const dt = Math.min(this.clock.getDelta(), 0.1);
+
+    if (this.controls.isLocked) {
+        const speed = (this.keys.shift ? 30 : 15) * dt;
+        if (this.keys.w) this.controls.moveForward(speed);
+        if (this.keys.s) this.controls.moveForward(-speed);
+        if (this.keys.a) this.controls.moveRight(-speed);
+        if (this.keys.d) this.controls.moveRight(speed);
+    }
+
+    this.updatePhysics(dt);
+    this.renderer.render(this.scene, this.camera);
+  }
 }
 
-animate();
+new Game();

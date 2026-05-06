@@ -2,229 +2,213 @@ import * as THREE from 'three';
 import { VRButton } from 'three/examples/jsm/webxr/VRButton.js';
 import { PointerLockControls } from 'three/examples/jsm/controls/PointerLockControls.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { shiftLeft, shiftRight } from 'three/tsl';
 
-// ==============================
-// CONFIG
-// ==============================
-const PLAYER_HEIGHT = 4;
-var PLAYER_SPEED = 15;
-const GRAVITY = 0;
+class Game {
+  private scene: THREE.Scene = new THREE.Scene();
+  private camera: THREE.PerspectiveCamera;
+  private renderer: THREE.WebGLRenderer;
+  private controls: PointerLockControls;
+  private player: THREE.Group = new THREE.Group();
+  
+  private interactionRaycaster = new THREE.Raycaster();
+  private rayOrigin = new THREE.Vector2(0, 0); 
 
-// ==============================
-// GETTERS E SETTERS
-// ==============================
+  private keys = { w: false, a: false, s: false, d: false, shift: false };
+  private interactiveObjects: THREE.Object3D[] = [];
+  
+  private selectedObject: THREE.Mesh | null = null;
+  private isGrabbed = false;
+  private isReturning = false;
+  private objectVelocity = new THREE.Vector3();
+  
+  // Variáveis auxiliares para evitar criar objetos no loop (causa travamento/lag)
+  private vTemp = new THREE.Vector3();
+  private targetPos = new THREE.Vector3();
 
+  private readonly GRAVITY = -15.0; 
+  private readonly THROW_FORCE = 30;
+  private readonly GROUND_LEVEL = -15.2; 
 
-// ==============================
-// CENA
-// ==============================
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x777777);
+  private clock = new THREE.Clock();
 
-// ==============================
-// CÂMERA
-// ==============================
-const camera = new THREE.PerspectiveCamera(
-  70,
-  window.innerWidth / window.innerHeight,
-  0.1,
-  500
-);
+  constructor() {
+    this.scene.background = new THREE.Color(0x111111);
 
-// ==============================
-// RENDERER
-// ==============================
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setPixelRatio(window.devicePixelRatio);
-renderer.xr.enabled = true;
-renderer.shadowMap.enabled = true;
+    this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+    this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Limita pixel ratio para performance
+    this.renderer.xr.enabled = true;
+    
+    document.body.appendChild(this.renderer.domElement);
+    document.body.appendChild(VRButton.createButton(this.renderer));
 
-document.body.appendChild(renderer.domElement);
-document.body.appendChild(VRButton.createButton(renderer));
+    this.player.position.set(0, 4, 10); 
+    this.player.add(this.camera);
+    this.scene.add(this.player);
 
-// ==============================
-// PLAYER
-// ==============================
-const player = new THREE.Group();
-player.position.set(0, PLAYER_HEIGHT, 0);
-player.add(camera);
-scene.add(player);
+    this.controls = new PointerLockControls(this.camera, this.renderer.domElement);
 
-// ==============================
-// CONTROLES FPS
-// ==============================
-const controls = new PointerLockControls(camera, document.body);
+    this.initLights();
+    this.initEvents();
+    this.loadModel();
 
-document.addEventListener('click', () => {
-  if (!renderer.xr.isPresenting) controls.lock();
-});
-
-const keys = {
-  w: false,
-  a: false,
-  s: false,
-  d: false,
-  shiftLeft: false,
-  shiftRight: false
-};
-
-document.addEventListener('keydown', e => {
-  if (e.code === 'KeyW') keys.w = true;
-  if (e.code === 'KeyA') keys.a = true;
-  if (e.code === 'KeyS') keys.s = true;
-  if (e.code === 'KeyD') keys.d = true;
-  if (e.code === 'ShiftLeft') keys.shiftLeft = true;
-  if (e.code === 'ShiftRight') keys.shiftRight = true;
-  // uso correto
-  if (keys.shiftLeft || keys.shiftRight) {
-    console.log('Correndo');
-    PLAYER_SPEED = 30;
-    console.log(PLAYER_SPEED);
+    this.renderer.setAnimationLoop(this.animate.bind(this));
   }
 
-});
+  private initLights() {
+    this.scene.add(new THREE.AmbientLight(0xffffff, 1.0));
+    const dir = new THREE.DirectionalLight(0xffffff, 1.5);
+    dir.position.set(10, 20, 10);
+    this.scene.add(dir);
+  }
 
-document.addEventListener('keyup', e => {
-  if (e.code === 'KeyW') keys.w = false;
-  if (e.code === 'KeyA') keys.a = false;
-  if (e.code === 'KeyS') keys.s = false;
-  if (e.code === 'KeyD') keys.d = false;
-  if (e.code === 'ShiftLeft') keys.shiftLeft = false;
-  if (e.code === 'ShiftRight') keys.shiftRight = false;
-  console.log('Andando');
-  PLAYER_SPEED = 15;
-  console.log(PLAYER_SPEED);
-});
+  private loadModel() {
+    const loader = new GLTFLoader();
+    loader.load('/models/EstruturaLassu.glb', (gltf) => {
+      const model = gltf.scene;
+      model.position.set(-170, -15, 0);
+      this.scene.add(model);
 
-// ==============================
-// LUZ
-// ==============================
-scene.add(new THREE.AmbientLight(0xffffff, 0.6));
-const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
-dirLight.position.set(10, 20, 10);
-dirLight.castShadow = true;
-scene.add(dirLight);
+      model.traverse(obj => {
+        if (obj instanceof THREE.Mesh) {
+          if (obj.name.toLowerCase().includes("calculadora")) {
+            obj.updateMatrixWorld(true);
+            const worldPos = new THREE.Vector3();
+            const worldQuat = new THREE.Quaternion();
+            obj.getWorldPosition(worldPos);
+            obj.getWorldQuaternion(worldQuat);
 
-const luz2 = new THREE.DirectionalLight(0xffffff, 2);
-luz2.position.set(-10, -20, -10);
-luz2.castShadow = true;
-scene.add(luz2);
-
-// // ==============================
-// // LUZ
-// // ==============================
-// scene.add(new THREE.AmbientLight(0xffffff, 0.9));
-
-// const hemi = new THREE.HemisphereLight(
-//   0xffffff,
-//   0x888888,
-//   0.6
-// );
-// scene.add(hemi);
-
-// ==============================
-// LOAD GLB
-// ==============================
-const loader = new GLTFLoader();
-let museum: THREE.Group | null = null;
-const floorMeshes: THREE.Mesh[] = [];
-
-loader.load(
-  '/models/EstruturaLassu.glb',
-  (gltf) => {
-    museum = gltf.scene;
-    museum.scale.setScalar(1);
-
-    museum.traverse(obj => {
-      if (obj instanceof THREE.Mesh) {
-        obj.castShadow = true;
-        obj.receiveShadow = true;
-
-        if (obj.name.toLowerCase().includes('floor')) {
-          floorMeshes.push(obj);
+            obj.userData.homePosition = worldPos.clone();
+            obj.userData.homeRotation = worldQuat.clone();
+            this.interactiveObjects.push(obj);
+          }
         }
-      }
+      });
+    });
+  }
+
+  private initEvents() {
+    // CORREÇÃO DE TRAVAMENTO: Só tenta lock se não estiver segurando nada
+    this.renderer.domElement.addEventListener('mousedown', () => {
+        if (!this.controls.isLocked && !this.isGrabbed) {
+            this.controls.lock();
+        } else if (this.controls.isLocked) {
+            this.grabObject();
+        }
     });
 
+    document.addEventListener('mouseup', () => {
+        if (this.isGrabbed) this.throwObject();
+    });
 
-    // garante que o museu fique no chão do mundo
-    museum.position.set(-170, 0, 0);
-    scene.add(museum);
+    document.addEventListener('keydown', (e) => {
+      if (e.code === 'KeyW') this.keys.w = true;
+      if (e.code === 'KeyA') this.keys.a = true;
+      if (e.code === 'KeyS') this.keys.s = true;
+      if (e.code === 'KeyD') this.keys.d = true;
+      if (e.code === 'KeyE') this.grabObject();
+    });
 
+    document.addEventListener('keyup', (e) => {
+      if (e.code === 'KeyW') this.keys.w = false;
+      if (e.code === 'KeyA') this.keys.a = false;
+      if (e.code === 'KeyS') this.keys.s = false;
+      if (e.code === 'KeyD') this.keys.d = false;
+      if (e.code === 'KeyE') this.throwObject();
+    });
 
-    // spawn do player acima do chão
-    player.position.y = PLAYER_HEIGHT + 15;
-
-    console.log('Museu carregado. Chãos detectados:', floorMeshes.length);
-  },
-  undefined,
-  (error) => {
-    console.error('Erro ao carregar GLB:', error);
-  }
-);
-
-// ==============================
-// COLISÃO COM CHÃO
-// ==============================
-const raycaster = new THREE.Raycaster();
-const down = new THREE.Vector3(0, -1, 0);
-let velocityY = 0;
-
-// ==============================
-// LOOP
-// ==============================
-const clock = new THREE.Clock();
-
-function animate() {
-  const dt = clock.getDelta();
-
-  // Movimento
-  if (controls.isLocked) {
-    const forward = new THREE.Vector3();
-    camera.getWorldDirection(forward);
-    forward.y = 0;
-    forward.normalize();
-
-    const right = new THREE.Vector3();
-    right.crossVectors(camera.up, forward).normalize(); // <<< CORREÇÃO DO INVERTIDO
-
-    if (keys.w) player.position.addScaledVector(forward, PLAYER_SPEED * dt);
-    if (keys.s) player.position.addScaledVector(forward, -PLAYER_SPEED * dt);
-    if (keys.a) player.position.addScaledVector(right, PLAYER_SPEED * dt);
-    if (keys.d) player.position.addScaledVector(right, -PLAYER_SPEED * dt);
+    window.addEventListener('resize', () => {
+      this.camera.aspect = window.innerWidth / window.innerHeight;
+      this.camera.updateProjectionMatrix();
+      this.renderer.setSize(window.innerWidth, window.innerHeight);
+    });
   }
 
-  // Gravidade
-  velocityY += GRAVITY * dt;
-  player.position.y += velocityY * dt;
+  private grabObject() {
+    if (this.isGrabbed) return;
 
-  // Raycast chão
-  if (floorMeshes.length > 0) {
-    raycaster.set(
-      new THREE.Vector3(player.position.x, player.position.y + 0.1, player.position.z),
-      down
-    );
+    this.interactionRaycaster.setFromCamera(this.rayOrigin, this.camera);
+    const hits = this.interactionRaycaster.intersectObjects(this.interactiveObjects, true);
 
-    const hits = raycaster.intersectObjects(floorMeshes, true);
-
-    if (hits.length && hits[0].distance <= PLAYER_HEIGHT) {
-      player.position.y = hits[0].point.y + PLAYER_HEIGHT;
-      velocityY = 0;
+    if (hits.length > 0) {
+      this.selectedObject = hits[0].object as THREE.Mesh;
+      this.isGrabbed = true;
+      this.isReturning = false;
+      this.objectVelocity.set(0, 0, 0);
+      
+      // Essencial para estabilidade: muda o pai para a cena
+      this.scene.attach(this.selectedObject);
     }
   }
 
-  renderer.render(scene, camera);
+  private throwObject() {
+    if (!this.selectedObject || !this.isGrabbed) return;
+    this.isGrabbed = false;
+    this.camera.getWorldDirection(this.objectVelocity);
+    this.objectVelocity.multiplyScalar(this.THROW_FORCE);
+  }
+
+  private updatePhysics(dt: number) {
+    if (!this.selectedObject) return;
+
+    if (this.isGrabbed) {
+      // Calcula posição alvo (1.5m à frente da câmera)
+      this.targetPos.set(0, 0, -1.5); 
+      this.targetPos.applyMatrix4(this.camera.matrixWorld);
+      
+      // Interpolação (Lerp) - suaviza o movimento para não travar
+      this.selectedObject.position.lerp(this.targetPos, 0.15);
+      this.selectedObject.quaternion.slerp(this.camera.quaternion, 0.1);
+
+    } else if (this.isReturning) {
+      const home = this.selectedObject.userData.homePosition as THREE.Vector3;
+      const homeRot = this.selectedObject.userData.homeRotation as THREE.Quaternion;
+
+      this.selectedObject.position.lerp(home, 0.08);
+      this.selectedObject.quaternion.slerp(homeRot, 0.08);
+
+      if (this.selectedObject.position.distanceTo(home) < 0.02) {
+        this.selectedObject.position.copy(home);
+        this.selectedObject.quaternion.copy(homeRot);
+        this.isReturning = false;
+        this.selectedObject = null;
+      }
+    } else {
+      // Gravidade com trava de velocidade máxima para evitar bugs
+      this.objectVelocity.y += this.GRAVITY * dt;
+      this.selectedObject.position.addScaledVector(this.objectVelocity, dt);
+
+      if (this.selectedObject.position.y < this.GROUND_LEVEL) {
+        this.selectedObject.position.y = this.GROUND_LEVEL;
+        this.objectVelocity.set(0, 0, 0);
+        
+        // Timer de retorno seguro
+        setTimeout(() => {
+            if (!this.isGrabbed && this.selectedObject && !this.isReturning) {
+                this.isReturning = true;
+            }
+        }, 2000);
+      }
+    }
+  }
+
+  private animate() {
+    // SEGURANÇA MÁXIMA: Limita o dt para nunca ser zero ou gigante
+    const rawDt = this.clock.getDelta();
+    const dt = Math.min(rawDt, 0.05); 
+
+    if (this.controls.isLocked) {
+        const speed = 15 * dt;
+        if (this.keys.w) this.controls.moveForward(speed);
+        if (this.keys.s) this.controls.moveForward(-speed);
+        if (this.keys.a) this.controls.moveRight(-speed);
+        if (this.keys.d) this.controls.moveRight(speed);
+    }
+
+    this.updatePhysics(dt);
+    this.renderer.render(this.scene, this.camera);
+  }
 }
 
-renderer.setAnimationLoop(animate);
-
-// ==============================
-// RESIZE
-// ==============================
-window.addEventListener('resize', () => {
-  camera.aspect = window.innerWidth / window.innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
-});
+new Game();
