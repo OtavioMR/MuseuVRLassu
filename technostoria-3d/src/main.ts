@@ -120,6 +120,20 @@ const loader = new GLTFLoader();
 let museum: THREE.Group | null = null;
 const floorMeshes: THREE.Mesh[] = [];
 
+// ==============================
+// INTERACTION
+// ==============================
+const interactionRaycaster = new THREE.Raycaster();
+const rayOrigin = new THREE.Vector2(0, 0); // Center of the screen
+const interactiveObjects: THREE.Object3D[] = [];
+let selectedObject: THREE.Object3D | null = null;
+let isGrabbing = false;
+const objectPhysics = {
+  velocity: new THREE.Vector3(),
+  isReturning: false,
+  throwForce: 10,
+};
+
 loader.load(
   '/models/EstruturaLassu.glb',
   (gltf) => {
@@ -144,7 +158,33 @@ loader.load(
     // spawn do player acima do chão
     player.position.y = PLAYER_HEIGHT+FLOOR_HEIGHT;
 
+    // Carrega a calculadora DEPOIS que o museu estiver pronto
     console.log('Museu carregado. Chãos detectados:', floorMeshes.length);
+    loader.load(
+      '/models/Calculator.glb',
+      (gltfCalc) => {
+        const calculator = gltfCalc.scene;
+        // Posição relativa ao museu (em cima de uma das mesas)
+        calculator.scale.setScalar(0.1);
+        calculator.rotateX(-Math.PI / 2);
+        calculator.position.set(160, 15.5, -38);
+
+        calculator.traverse(obj => {
+          if (obj instanceof THREE.Mesh) {
+            obj.castShadow = true;
+            obj.receiveShadow = true;
+
+            // Save original position and add to interactive list
+            obj.userData.originalPosition = obj.position.clone();
+            obj.userData.originalParent = museum;
+            interactiveObjects.push(obj);
+          }
+        });
+
+        // Adiciona a calculadora como filha do museu
+        museum?.add(calculator);
+      }
+    );
   },
   undefined,
   (error) => {
@@ -199,6 +239,23 @@ const down = new THREE.Vector3(0, -1, 0);
 let velocityY = 0;
 
 // ==============================
+// CROSSHAIR UI
+// ==============================
+const crosshair = document.createElement('div');
+crosshair.id = 'crosshair';
+crosshair.innerText = '+';
+crosshair.style.position = 'absolute';
+crosshair.style.top = '50%';
+crosshair.style.left = '50%';
+crosshair.style.transform = 'translate(-50%, -50%)';
+crosshair.style.color = 'white';
+crosshair.style.fontSize = '24px';
+crosshair.style.textShadow = '0 0 4px black';
+crosshair.style.pointerEvents = 'none'; // Make it non-interactive
+crosshair.style.zIndex = '1001';
+crosshair.style.display = 'none'; // Hidden by default
+document.body.appendChild(crosshair);
+// ==============================
 // LOGIN UI
 // ==============================
 const loginContainer = document.createElement('div');
@@ -243,6 +300,7 @@ document.body.appendChild(loginContainer);
 joinBtn.addEventListener('click', () => {
   const username = nameInput.value.trim() || 'Player';
   loginContainer.style.display = 'none';
+  crosshair.style.display = 'block'; // Show crosshair
   socket.emit('join', username);
   if (!renderer.xr.isPresenting) controls.lock();
 });
@@ -418,8 +476,71 @@ function animate() {
   // Animate other players
   Object.values(otherPlayers).forEach(p => p.animate(p.is_moving));
 
+  // Interaction Physics
+  updateInteraction(dt);
+
   renderer.render(scene, camera);
+  console.log(player.position);
 }
+
+function grabOrThrow() {
+  if (isGrabbing && selectedObject) {
+    // Throw
+    isGrabbing = false;
+    const direction = new THREE.Vector3();
+    camera.getWorldDirection(direction);
+    objectPhysics.velocity.copy(direction).multiplyScalar(objectPhysics.throwForce);
+
+    // Return to scene from camera
+    scene.attach(selectedObject);
+    selectedObject = null;
+
+  } else {
+    // Grab
+    interactionRaycaster.setFromCamera(rayOrigin, camera);
+    const hits = interactionRaycaster.intersectObjects(interactiveObjects);
+
+    if (hits.length > 0) {
+      selectedObject = hits[0].object;
+      isGrabbing = true;
+      objectPhysics.velocity.set(0, 0, 0);
+
+      // Attach to camera
+      camera.attach(selectedObject);
+      selectedObject.position.set(0, -0.2, -0.8); // Position in front of camera
+    }
+  }
+}
+
+function updateInteraction(dt: number) {
+  if (isGrabbing || !selectedObject) return;
+
+  // Apply gravity only when not held
+  const GRAVITY_INTERACTION = -9.8;
+  objectPhysics.velocity.y += GRAVITY_INTERACTION * dt;
+  selectedObject.position.addScaledVector(objectPhysics.velocity, dt);
+
+  // Simple floor collision
+  if (selectedObject.position.y < FLOOR_HEIGHT) {
+    selectedObject.position.y = FLOOR_HEIGHT;
+    objectPhysics.velocity.set(0, 0, 0);
+  }
+}
+
+
+document.addEventListener('mousedown', (e) => {
+  // Use left click to interact
+  if (controls.isLocked && e.button === 0) {
+    grabOrThrow();
+  }
+});
+
+document.addEventListener('keydown', (e) => {
+  // Use 'E' key to interact
+  if (e.code === 'KeyE') {
+    grabOrThrow();
+  }
+});
 
 renderer.setAnimationLoop(animate);
 
