@@ -150,21 +150,17 @@ loader.load(
         }
       }
     });
-    // garante que o museu fique no chão do mundo
     museum.position.set(-170, 0, 0);
     scene.add(museum);
 
 
-    // spawn do player acima do chão
     player.position.y = PLAYER_HEIGHT+FLOOR_HEIGHT;
 
-    // Carrega a calculadora DEPOIS que o museu estiver pronto
     console.log('Museu carregado. Chãos detectados:', floorMeshes.length);
     loader.load(
       '/models/Calculator.glb',
       (gltfCalc) => {
         const calculator = gltfCalc.scene;
-        // Posição relativa ao museu (em cima de uma das mesas)
         calculator.scale.setScalar(0.1);
         calculator.rotateX(-Math.PI / 2);
         calculator.position.set(160, 15.5, -38);
@@ -174,7 +170,6 @@ loader.load(
             obj.castShadow = true;
             obj.receiveShadow = true;
 
-            // Save original position and add to interactive list
             obj.userData.originalPosition = obj.position.clone();
             obj.userData.originalParent = museum;
             interactiveObjects.push(obj);
@@ -300,7 +295,7 @@ document.body.appendChild(loginContainer);
 joinBtn.addEventListener('click', () => {
   const username = nameInput.value.trim() || 'Player';
   loginContainer.style.display = 'none';
-  crosshair.style.display = 'block'; // Show crosshair
+  crosshair.style.display = 'block';
   socket.emit('join', username);
   if (!renderer.xr.isPresenting) controls.lock();
 });
@@ -454,11 +449,9 @@ function animate() {
     if (keys.d) player.position.addScaledVector(right, -PLAYER_SPEED * dt);
   }
 
-  // Gravidade
   velocityY += GRAVITY * dt;
   player.position.y += velocityY * dt;
 
-  // Raycast chão
   if (floorMeshes.length > 0) {
     raycaster.set(
       new THREE.Vector3(player.position.x, player.position.y + 0.1, player.position.z),
@@ -473,10 +466,8 @@ function animate() {
     }
   }
 
-  // Animate other players
   Object.values(otherPlayers).forEach(p => p.animate(p.is_moving));
 
-  // Interaction Physics
   updateInteraction(dt);
 
   renderer.render(scene, camera);
