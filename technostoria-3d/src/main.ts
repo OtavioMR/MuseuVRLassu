@@ -126,13 +126,10 @@ const floorMeshes: THREE.Mesh[] = [];
 const interactionRaycaster = new THREE.Raycaster();
 const rayOrigin = new THREE.Vector2(0, 0); // Center of the screen
 const interactiveObjects: THREE.Object3D[] = [];
-let selectedObject: THREE.Object3D | null = null;
-let isGrabbing = false;
-const objectPhysics = {
-  velocity: new THREE.Vector3(),
-  isReturning: false,
-  throwForce: 10,
-};
+
+let isRotatingObject = false;
+let rotatingObject: THREE.Object3D | null = null;
+const savedCameraQuaternion = new THREE.Quaternion();
 
 loader.load(
   '/models/EstruturaLassu.glb',
@@ -162,8 +159,7 @@ loader.load(
       (gltfCalc) => {
         const calculator = gltfCalc.scene;
         calculator.scale.setScalar(0.1);
-        calculator.rotateX(-Math.PI / 2);
-        calculator.position.set(160, 15.5, -38);
+        calculator.position.set(160, 16.5, -38);
 
         calculator.traverse(obj => {
           if (obj instanceof THREE.Mesh) {
@@ -415,7 +411,6 @@ function animate() {
 
   is_moving = controls.isLocked && (keys.w || keys.a || keys.s || keys.d);
 
-  // Envia a posição do jogador para o servidor se houver mudança
   if (loginContainer.style.display === 'none' && (
     oldPosition.distanceTo(player.position) > 0.01 ||
     oldRotation !== currentRotationY ||
@@ -466,70 +461,46 @@ function animate() {
     }
   }
 
-  Object.values(otherPlayers).forEach(p => p.animate(p.is_moving));
+  if (isRotatingObject) {
+    camera.quaternion.copy(savedCameraQuaternion);
+  }
 
-  updateInteraction(dt);
+  Object.values(otherPlayers).forEach(p => p.animate(p.is_moving));
 
   renderer.render(scene, camera);
   console.log(player.position);
 }
 
-function grabOrThrow() {
-  if (isGrabbing && selectedObject) {
-    // Throw
-    isGrabbing = false;
-    const direction = new THREE.Vector3();
-    camera.getWorldDirection(direction);
-    objectPhysics.velocity.copy(direction).multiplyScalar(objectPhysics.throwForce);
-
-    // Return to scene from camera
-    scene.attach(selectedObject);
-    selectedObject = null;
-
-  } else {
-    // Grab
+document.addEventListener('mousedown', (e) => {
+  if (controls.isLocked && e.button === 0) {
     interactionRaycaster.setFromCamera(rayOrigin, camera);
     const hits = interactionRaycaster.intersectObjects(interactiveObjects);
 
     if (hits.length > 0) {
-      selectedObject = hits[0].object;
-      isGrabbing = true;
-      objectPhysics.velocity.set(0, 0, 0);
-
-      // Attach to camera
-      camera.attach(selectedObject);
-      selectedObject.position.set(0, -0.2, -0.8); // Position in front of camera
+      isRotatingObject = true;
+      rotatingObject = hits[0].object;
+      
+      savedCameraQuaternion.copy(camera.quaternion);
     }
-  }
-}
-
-function updateInteraction(dt: number) {
-  if (isGrabbing || !selectedObject) return;
-
-  // Apply gravity only when not held
-  const GRAVITY_INTERACTION = -9.8;
-  objectPhysics.velocity.y += GRAVITY_INTERACTION * dt;
-  selectedObject.position.addScaledVector(objectPhysics.velocity, dt);
-
-  // Simple floor collision
-  if (selectedObject.position.y < FLOOR_HEIGHT) {
-    selectedObject.position.y = FLOOR_HEIGHT;
-    objectPhysics.velocity.set(0, 0, 0);
-  }
-}
-
-
-document.addEventListener('mousedown', (e) => {
-  // Use left click to interact
-  if (controls.isLocked && e.button === 0) {
-    grabOrThrow();
   }
 });
 
-document.addEventListener('keydown', (e) => {
-  // Use 'E' key to interact
-  if (e.code === 'KeyE') {
-    grabOrThrow();
+document.addEventListener('mousemove', (e) => {
+  if (isRotatingObject && rotatingObject && controls.isLocked) {
+    const deltaX = e.movementX || 0;
+    const deltaY = e.movementY || 0;
+    
+    const rotationSpeed = 0.005;
+
+    rotatingObject.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), deltaX * rotationSpeed);
+    rotatingObject.rotateOnWorldAxis(new THREE.Vector3(0, 0, 1), deltaY * rotationSpeed);
+  }
+});
+
+document.addEventListener('mouseup', (e) => {
+  if (e.button === 0) {
+    isRotatingObject = false;
+    rotatingObject = null;
   }
 });
 
